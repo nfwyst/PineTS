@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env bun
 
 /**
  * Generate a test file and expected data from a .pine.ts indicator
@@ -9,20 +9,19 @@
  * 3. Creates a .test.ts file that uses the expected data
  *
  * Usage as CLI:
- *   tsx gen-test.ts <indicator-path> <test-output-path>
+ *   bun run gen-test.ts <indicator-path> <test-output-path>
  *
  * Usage as module:
  *   import { generateTest } from './gen-test.js';
  *   await generateTest(indicatorPath, testOutputPath);
  *
  * Example:
- *   tsx gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts
+ *   bun run gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts
  */
 
-import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { generateExpectedData } from './expect-gen.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -73,6 +72,8 @@ export async function generateTest(indicatorPath: string, testOutputPath: string
     const testDir = path.dirname(resolvedTestOutputPath);
     const serializerPath = path.relative(testDir, path.join(__dirname, 'lib', 'serializer.js'));
     const serializerImport = serializerPath.replace(/\\/g, '/');
+    const utilsPath = path.relative(testDir, path.join(__dirname, '..', 'utils'));
+    const utilsImport = utilsPath.replace(/\\/g, '/');
 
     // Generate the test file
     const testTemplate = `import { PineTS } from 'index';
@@ -82,6 +83,7 @@ import * as path from 'path';
 
 import { Provider } from '@pinets/marketData/Provider.class';
 import { deserialize, deepEqual } from '${serializerImport}';
+import { normalizePlotString } from '${utilsImport}';
 
 describe('${namespaceUpper} Namespace - ${methodName.toUpperCase()} Method', () => {
     it('should calculate ${methodName.toUpperCase()} correctly with native series and variable series', async () => {
@@ -127,8 +129,8 @@ ${indicatorBody
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 });
 `;
@@ -138,12 +140,13 @@ ${indicatorBody
 }
 
 // CLI usage
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+const entryPath = process.argv[1];
+if (entryPath !== undefined && import.meta.url === pathToFileURL(entryPath).href) {
     const args = process.argv.slice(2);
 
     if (args.length < 2) {
-        console.error('Usage: tsx gen-test.ts <indicator-path> <test-output-path>');
-        console.error('Example: tsx gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts');
+        console.error('Usage: bun run gen-test.ts <indicator-path> <test-output-path>');
+        console.error('Example: bun run gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts');
         process.exit(1);
     }
 

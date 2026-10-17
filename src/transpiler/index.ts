@@ -52,8 +52,16 @@ import ScopeManager from './analysis/ScopeManager';
 import { injectImplicitImports } from './transformers/InjectionTransformer';
 import { normalizeNativeImports } from './transformers/NormalizationTransformer';
 import { wrapInContextFunction } from './transformers/WrapperTransformer';
-import { transformNestedArrowFunctions, renameParamsShadowingFunctions, preProcessContextBoundVars, preProcessUdtRegistry, runAnalysisPass } from './analysis/AnalysisPass';
+import {
+    transformNestedArrowFunctions,
+    renameParamsShadowingFunctions,
+    preProcessContextBoundVars,
+    preProcessUdtRegistry,
+    preProcessVaripDeclarations,
+    runAnalysisPass,
+} from './analysis/AnalysisPass';
 import { runTypeInferencePass } from './analysis/TypeInferencePass';
+import type { InferredPineType } from './analysis/TypeInferencePass';
 import { markLazyOperands } from './analysis/LazyOperandPass';
 import {
     runTransformationPass,
@@ -63,17 +71,97 @@ import {
     propagateAsyncAwait,
 } from './transformers/MainTransformer';
 import { extractPineScriptVersion, pineToJS } from './pineToJS/pineToJS.index';
+import type { PineWarning } from './pineToJS/pineToJS.index';
 import { buildLtfSlices } from './slicing/buildLtfSlices';
 import { verifyClosedWorld } from './analysis/ClosedWorldVerifier';
+
+/** Compile-time (non-blocking) warnings attached to a transpiled function. */
+export type { PineWarning };
+import { LIBRARY_SYMBOL_PREFIX, LIBRARY_VERSION_SCOPE_MARKER } from '../libraries/LibraryBindings';
+
+export type TranspileOptions = {
+    readonly debug: boolean;
+    readonly ln?: boolean;
+    readonly verify?: boolean;
+    readonly pineOnly?: boolean;
+};
+
+type VersionScope = {
+    readonly version: number | null;
+    readonly statements: unknown[];
+};
+
+function field(value: unknown, name: string): unknown {
+    return value !== null && typeof value === 'object' ? Reflect.get(value, name) : undefined;
+}
+
+function readVersionScopeMarker(statement: unknown): number | undefined {
+    const expression = field(statement, 'type') === 'ExpressionStatement'
+        ? field(statement, 'expression')
+        : undefined;
+    if (
+        field(expression, 'type') !== 'CallExpression' ||
+        field(field(expression, 'callee'), 'type') !== 'Identifier' ||
+        field(field(expression, 'callee'), 'name') !== LIBRARY_VERSION_SCOPE_MARKER
+    ) {
+        return undefined;
+    }
+    const args = field(expression, 'arguments');
+    const version = Array.isArray(args) ? field(args[0], 'value') : undefined;
+    return typeof version === 'number' ? version : undefined;
+}
+
+function extractVersionScopes(ast: unknown, fallbackVersion: number | null): VersionScope[] {
+    const programBody = field(ast, 'body');
+    const firstStatement = Array.isArray(programBody) ? programBody[0] : undefined;
+    const root = field(firstStatement, 'expression') ?? firstStatement;
+    const block = field(root, 'body');
+    const statements = field(block, 'body');
+    if (!Array.isArray(statements)) return [{ version: fallbackVersion, statements: [ast] }];
+
+    const retained: unknown[] = [];
+    const scopes: VersionScope[] = [];
+    let current: VersionScope = { version: fallbackVersion, statements: [] };
+    scopes.push(current);
+    for (const statement of statements) {
+        const markerVersion = readVersionScopeMarker(statement);
+        if (markerVersion !== undefined) {
+            current = { version: markerVersion, statements: [] };
+            scopes.push(current);
+            continue;
+        }
+        retained.push(statement);
+        current.statements.push(statement);
+    }
+    if (block !== null && typeof block === 'object') Reflect.set(block, 'body', retained);
+    return scopes.filter(({ statements: body }) => body.length > 0);
+}
+
+function annotateTypeFactoryVersion(node: unknown, version: number | null): void {
+    if (version === null || node === null || typeof node !== 'object') return;
+    const callee = field(node, 'callee');
+    if (
+        field(node, 'type') === 'CallExpression' &&
+        field(callee, 'type') === 'Identifier' &&
+        field(callee, 'name') === 'Type'
+    ) {
+        Reflect.set(node, '_pineVersionOverride', version);
+    }
+    for (const [key, value] of Object.entries(node)) {
+        if (key === 'parent' || key.startsWith('_')) continue;
+        if (Array.isArray(value)) value.forEach((entry) => annotateTypeFactoryVersion(entry, version));
+        else annotateTypeFactoryVersion(value, version);
+    }
+}
 
 /**
  * Resolve the input into PineTS code plus the Pine Script version it came from.
  * `version` is null for PineTS-syntax / function input (no //@version marker):
  * such code is JavaScript-like and follows JS semantics, not a Pine version.
  */
-function getPineTSFromSource(source: string | Function, opts: { pineOnly?: boolean } = {}): { code: string; version: number | null } {
+function getPineTSFromSource(source: string | Function, opts: { pineOnly?: boolean } = {}): { code: string; version: number | null; warnings: readonly PineWarning[] } {
     if (typeof source === 'function') {
-        return { code: source.toString(), version: null };
+        return { code: source.toString(), version: null, warnings: [] };
     } else {
         const pineScriptVersion = extractPineScriptVersion(source);
         if (pineScriptVersion === null) {
@@ -88,13 +176,13 @@ function getPineTSFromSource(source: string | Function, opts: { pineOnly?: boole
                 );
             }
             //assume it's PineTS syntax ==> use it as is
-            return { code: source, version: null };
+            return { code: source, version: null, warnings: [] };
         }
         if (pineScriptVersion >= 5) {
             //assume it's Pine Script syntax ==> use pineToJS to transpile it
             const pineToJSResult = pineToJS(source);
             if (pineToJSResult.success) {
-                return { code: pineToJSResult.code, version: pineScriptVersion };
+                return { code: pineToJSResult.code, version: pineScriptVersion, warnings: pineToJSResult.warnings ?? [] };
             } else {
                 throw new Error(`Failed to transpile Pine Script version ${pineScriptVersion}: ${pineToJSResult.error}`);
             }
@@ -104,18 +192,36 @@ function getPineTSFromSource(source: string | Function, opts: { pineOnly?: boole
     }
 }
 
+/**
+ * Attach compile-time warnings to the transpiled function so the runtime can
+ * surface them on the run Context (they are not generated during bar
+ * execution).
+ */
+function attachCompileWarnings(mainFn: Function, warnings: readonly PineWarning[]): void {
+    if (warnings.length > 0) (mainFn as any)._compileWarnings = warnings.slice();
+}
+
 export function transpile(
     source: string | Function,
-    options: { debug: boolean; ln?: boolean; verify?: boolean; pineOnly?: boolean } = { debug: false, ln: false }
+    options: TranspileOptions = { debug: false, ln: false },
 ): Function {
     // Handle backward compatibility if a boolean is passed (though signature changed)
     if (typeof options === 'boolean') {
         options = { debug: options, ln: true };
     }
 
-    const { debug } = options;
+    const { code: sourceCode, version: pineVersion, warnings } = getPineTSFromSource(source, { pineOnly: options.pineOnly });
+    return transpilePineTS(sourceCode, pineVersion, options, warnings);
+}
 
-    const { code: sourceCode, version: pineVersion } = getPineTSFromSource(source, { pineOnly: options.pineOnly });
+/** Compile Pine-to-JavaScript output while retaining its originating Pine version. */
+export function transpilePineTS(
+    sourceCode: string,
+    pineVersion: number | null,
+    options: TranspileOptions = { debug: false, ln: false },
+    compileWarnings: readonly PineWarning[] = [],
+): Function {
+    const { debug } = options;
     let code = sourceCode;
 
     // Pre-process: Wrap in context function if not already wrapped
@@ -129,6 +235,14 @@ export function transpile(
         sourceType: 'module',
         locations: debug,
     });
+    const versionScopes = extractVersionScopes(ast, pineVersion);
+    for (const scope of versionScopes) {
+        for (const statement of scope.statements) annotateTypeFactoryVersion(statement, scope.version);
+    }
+
+    // Only Pine codegen emits trusted declaration markers. PineTS syntax is
+    // user-authored JavaScript-like input, where the same string is ordinary data.
+    if (pineVersion !== null) preProcessVaripDeclarations(ast);
 
     // Pre-process: Transform all nested arrow functions
     transformNestedArrowFunctions(ast);
@@ -168,8 +282,17 @@ export function transpile(
     // and PineTS-syntax / function input (pineVersion === null) is JavaScript,
     // where `/` is always float division.
     // The same pass types array.from() elements (int vs float) for every Pine version.
-    if (pineVersion !== null) {
-        runTypeInferencePass(ast, scopeManager, { intDivision: pineVersion < 6 });
+    let inheritedLibraryTypes: ReadonlyMap<string, InferredPineType> = new Map();
+    for (const scope of versionScopes) {
+        if (scope.version === null) continue;
+        const inferredTypes = runTypeInferencePass(
+            { type: 'Program', body: scope.statements },
+            scopeManager,
+            { intDivision: scope.version < 6, inheritedTypes: inheritedLibraryTypes },
+        );
+        inheritedLibraryTypes = new Map(
+            [...inferredTypes].filter(([name]) => name.startsWith(LIBRARY_SYMBOL_PREFIX)),
+        );
     }
 
     // Lazy operands: tag nodes inside `?:` branches (every version) and the
@@ -178,7 +301,12 @@ export function transpile(
     // instead of hoisting them into unconditional temps. Pine v5 evaluates
     // `and`/`or` strictly (see TradingView's v6 migration guide, "Lazy
     // evaluation of conditions"), so v5 keeps the eager right operand.
-    markLazyOperands(ast, { lazyLogical: pineVersion === null || pineVersion >= 6 });
+    for (const scope of versionScopes) {
+        markLazyOperands(
+            { type: 'Program', body: scope.statements },
+            { lazyLogical: scope.version === null || scope.version >= 6 },
+        );
+    }
 
     // Second pass: transform the code
     runTransformationPass(ast, scopeManager, originalParamName, options, sourceLines);
@@ -229,8 +357,7 @@ export function transpile(
     }
 
     // Generate final code
-    // astring exports baseGenerator (camelCase) in this version/build
-    const baseGenerator = astring.baseGenerator || astring.GENERATOR || ((astring as any).default && (astring as any).default.BASE_GENERATOR);
+    const baseGenerator = astring.baseGenerator;
 
     const customGenerator = Object.assign({}, baseGenerator, {
         LineComment(node: any, state: any) {
@@ -275,6 +402,7 @@ export function transpile(
     const _wraperFunction = new Function('', `var _r = ${transformedCode}\n; return _r;`);
     const mainFn = _wraperFunction(this);
     (mainFn as any)._pineVersion = pineVersion;
+    attachCompileWarnings(mainFn, compileWarnings);
     if (slices && Object.keys(slices).length > 0) {
         for (const slice of Object.values(slices)) (slice as any)._pineVersion = pineVersion;
         (mainFn as any)._ltfSlices = slices;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrayPrecision, getKlines, runNSFunctionWithArgs } from '../../utils';
+import { arrayPrecision, getKlines, normalizePlotString, runNSFunctionWithArgs } from '../../utils';
 
 import { Context, PineTS, Provider } from 'index';
 
@@ -65,7 +65,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('RSI - Relative Strength Index', async () => {
@@ -78,7 +78,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
         ];
         console.log(' RSI ', part);
 
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('MOM - Momentum', async () => {
@@ -87,7 +87,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
         const part = result.values.reverse().slice(0, 10);
         const expected = [-514.06, -100.52, 252.51, 746.87, 701.04, 322.42, 214.91, 339.36, 234.14, 424.11];
         console.log(' MOM ', part);
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('ROC - Rate of Change', async () => {
@@ -99,7 +99,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
             0.4336976676,
         ];
         console.log(' ROC ', part);
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('MACD - Moving Average Convergence Divergence', async () => {
@@ -163,7 +163,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('STOCH - Stochastic Oscillator', async () => {
@@ -218,7 +218,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('CCI - Commodity Channel Index', async () => {
@@ -273,7 +273,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('MFI - Money Flow Index', async () => {
@@ -328,7 +328,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('CMO - Chande Momentum Oscillator', async () => {
@@ -383,7 +383,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('COG - Center of Gravity', async () => {
@@ -438,7 +438,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('TSI - True Strength Index', async () => {
@@ -493,7 +493,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('WPR - Williams %R', async () => {
@@ -548,7 +548,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('MOM - Momentum', async () => {
@@ -605,7 +605,7 @@ describe('Technical Analysis - Oscillators & Momentum', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
 

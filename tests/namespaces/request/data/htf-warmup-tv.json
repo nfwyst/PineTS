@@ -1,0 +1,33 @@
+{
+  "oracle": "TradingView Pine v6 ATR/RMA/EMA recurrence semantics, independently evaluated over 400 requested bars",
+  "provenance": [
+    "TradingView Pine Script v6 reference: request.security, ta.atr, ta.rma, ta.ema",
+    "LuxAlgo/PineTS issue #356: full-history requested-context warmup and Wilder seed decay"
+  ],
+  "period": 14,
+  "comparisonDigits": 7,
+  "warmupBars": 250,
+  "chartStart": 1736121600000,
+  "requests": {
+    "D": {
+      "historyBars": 400,
+      "stepMs": 86400000,
+      "scale": 1,
+      "expected": {
+        "atr": 2.2569182429,
+        "rma": 126.977200083,
+        "ema": 127.3875983589
+      }
+    },
+    "W": {
+      "historyBars": 400,
+      "stepMs": 604800000,
+      "scale": 2,
+      "expected": {
+        "atr": 2.8178828333,
+        "rma": 126.934400166,
+        "ema": 127.3001967178
+      }
+    }
+  }
+}

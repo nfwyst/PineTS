@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 LuxAlgo
 
+import type { LibraryResolver } from '../types/PineTypes';
+
+export type IndicatorPrepareOptions = {
+    readonly debug?: boolean;
+    readonly ln?: boolean;
+    readonly resolveLibrary?: LibraryResolver;
+};
+
 /**
  * Pine Script `input.*` typing classification. Mirrors TradingView's input
  * widget types 1:1. The bare `input()` wrapper auto-detects from `defval`

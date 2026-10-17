@@ -2,6 +2,7 @@
 // Copyright (C) 2026 LuxAlgo
 
 import { resolveColorToRgba } from '../../../namespaces/color/PineColor';
+import { arrayField, field } from '../qualifierAnalysisAst';
 import { COLOR_LITERAL, dottedName } from './constEval';
 
 /**
@@ -26,6 +27,8 @@ export interface QualifierEnv {
      * variable has that name.
      */
     lookup(name: string): Qualified | null | undefined;
+    /** Resolve calls whose qualified return depends on script-level metadata. */
+    resolveCall?(name: string, node: unknown): Qualified | undefined;
 }
 
 const RANK: Record<Qualifier, number> = { const: 0, input: 1, simple: 2, series: 3 };
@@ -33,7 +36,17 @@ const RANK: Record<Qualifier, number> = { const: 0, input: 1, simple: 2, series:
 const maxQual = (...qs: Qualifier[]): Qualifier => qs.reduce((a, b) => (RANK[b] > RANK[a] ? b : a), 'const');
 
 const BUILTIN_VARIABLES: Record<string, Qualified> = {};
-const define = (qual: Qualifier, type: ValueType, names: string[]) => names.forEach((n) => (BUILTIN_VARIABLES[n] = { qual, type }));
+/**
+ * Bare built-in variable names that trigger CW10011 when a user binding
+ * shadows them. Qualified names like `timeframe.multiplier` and namespace
+ * names (`color`, `line`, …) are excluded. Populated by `define()` below.
+ */
+export const BUILTIN_VARIABLE_NAMES = new Set<string>();
+const define = (qual: Qualifier, type: ValueType, names: string[]) =>
+    names.forEach((n) => {
+        BUILTIN_VARIABLES[n] = { qual, type };
+        if (!n.includes('.')) BUILTIN_VARIABLE_NAMES.add(n);
+    });
 define('series', 'float', ['open', 'high', 'low', 'close', 'volume', 'hl2', 'hlc3', 'ohlc4', 'hlcc4', 'ask', 'bid']);
 define('series', 'int', [
     'bar_index',
@@ -73,6 +86,7 @@ define('simple', 'string', [
     'syminfo.description',
 ]);
 define('simple', 'bool', [
+    'timeframe.isticks',
     'timeframe.isintraday',
     'timeframe.isdaily',
     'timeframe.isweekly',
@@ -137,6 +151,8 @@ export function inferQualified(node: any, env: QualifierEnv): Qualified | undefi
             if (isNum(a.type) && isNum(b.type)) return { qual, type: 'float' };
             return undefined;
         }
+        case 'SwitchExpression':
+            return inferSwitch(node, env);
         case 'CallExpression':
             return inferCall(node, env);
         default:
@@ -144,10 +160,48 @@ export function inferQualified(node: any, env: QualifierEnv): Qualified | undefi
     }
 }
 
+function inferSwitch(node: unknown, env: QualifierEnv): Qualified | undefined {
+    const operands: Qualified[] = [], values: Qualified[] = [];
+    const discriminantNode = field(node, 'discriminant');
+    if (discriminantNode) {
+        const discriminant = inferQualified(discriminantNode, env);
+        if (!discriminant) return undefined;
+        operands.push(discriminant);
+    }
+    for (const switchCase of arrayField(node, 'cases')) {
+        const testNode = field(switchCase, 'test');
+        if (testNode) {
+            const test = inferQualified(testNode, env);
+            if (!test) return undefined;
+            operands.push(test);
+        }
+        const value = inferQualified(field(switchCase, 'consequent'), env);
+        if (!value) return undefined;
+        operands.push(value); values.push(value);
+    }
+    if (values.length === 0) return undefined;
+    const type = values.every((value) => value.type === values[0].type)
+        ? values[0].type
+        : values.every((value) => isNum(value.type))
+          ? 'float'
+          : undefined;
+    return type ? { qual: maxQual(...operands.map((operand) => operand.qual)), type } : undefined;
+}
+
 function inferCall(node: any, env: QualifierEnv): Qualified | undefined {
     const callee = dottedName(node.callee);
     if (!callee) return undefined;
+    const resolved = env.resolveCall?.(callee, node);
+    if (resolved) return resolved;
     const rawArgs: any[] = (node.arguments ?? []).filter((a: any) => a?.type !== 'ObjectExpression');
+    if (
+        (callee === 'int' || callee === 'float') &&
+        rawArgs.length === 1 &&
+        rawArgs[0]?.type === 'Identifier' &&
+        rawArgs[0].name === 'na'
+    ) {
+        return { qual: 'simple', type: callee };
+    }
 
     if (callee.startsWith('ta.')) {
         const fn = callee.slice(3);
@@ -164,6 +218,10 @@ function inferCall(node: any, env: QualifierEnv): Qualified | undefined {
         if (qs.length === 1 && qs[0].type === 'string') return { qual, type: 'int' };
         if (qs.length >= 3) return { qual: maxQual('simple', qual), type: 'int' };
         return undefined;
+    }
+    if (callee === 'timeframe.in_seconds') {
+        if (qs.length === 0) return { qual: 'simple', type: 'int' };
+        return qs.length === 1 && qs[0].type === 'string' ? { qual: maxQual('simple', qs[0].qual), type: 'int' } : undefined;
     }
     if (callee === 'color.new' || callee === 'color.rgb') return { qual, type: 'color' };
     if (callee === 'int' && qs.length === 1 && isNum(qs[0].type)) return { qual, type: 'int' };

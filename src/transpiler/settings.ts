@@ -93,10 +93,23 @@ export const VIEWPORT_DEPENDENT_BUILTINS = ['chart.left_visible_bar_time', 'char
 // `'strategy.exit'` → only that method). The transpiler checks both
 // forms.
 export const CALLSITE_ID_NAMESPACES = [
-    'plot',           // all plot methods (including plot, plotchar, plotshape, plotarrow, plotbar, plotcandle)
+    'plot',           // plot(...) is normalized to plot.any(...)
     'hline',          // all hline methods
     'fill',           // all fill methods
     'strategy.exit',  // cadence-detection for persistent vs ephemeral exit-parameter capture
+];
+
+// Plot functions called as bare identifiers receive the same trailing
+// `{ __callsiteId }` options object as plot.* calls. Without it, untitled
+// calls share the generic "plot" key and interleave their data.
+export const CALLSITE_ID_FUNCTIONS: readonly string[] = [
+    'plotchar',
+    'plotshape',
+    'plotarrow',
+    'plotbar',
+    'plotcandle',
+    'bgcolor',
+    'barcolor',
 ];
 
 // Factory methods that create objects with side effects (format: 'namespace.method')

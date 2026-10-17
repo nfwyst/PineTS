@@ -97,7 +97,7 @@ return [[macdLine, signalLine, histLine]];
 
 ### 2. Precision
 
-All numeric returns should be formatted using `context.precision()`. This ensures consistent decimal handling matching Pine Script defaults (usually 10 decimals).
+Numeric returns should pass through `context.precision()`. Without an explicit decimal count it preserves Pine's internal float precision; only APIs whose contract explicitly requests decimal rounding should pass a count.
 
 ```typescript
 return context.precision(result);
@@ -209,7 +209,7 @@ When you add a new method (e.g., `methods/newIndicator.ts`), you must regenerate
 **Command:**
 
 ```bash
-npm run generate:ta-index
+bun run generate:ta-index
 ```
 
 This script automatically:

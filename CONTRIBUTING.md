@@ -33,7 +33,7 @@ This project follows a simple principle: **Be respectful and constructive**. We'
   - Clear description of the bug
   - Steps to reproduce
   - Expected vs actual behavior
-  - PineTS version and environment (Node.js version, browser, etc.)
+  - PineTS version and environment (Bun version, browser, etc.)
   - Sample code that reproduces the issue
 
 ### 💡 Suggesting Features
@@ -81,7 +81,7 @@ Large PRs (1000+ lines) are very difficult to review properly and can delay merg
 Before submitting, ensure:
 
 - [ ] **Tests are included** for all new functionality
-- [ ] **All tests pass**: Run `npm test -- --run`
+- [ ] **All tests pass**: Run `bun run test --run`
 - [ ] **Code follows project style** (see [Code Style](#code-style))
 - [ ] **Documentation is updated** if you changed public APIs
 - [ ] **Commit messages are clear** and describe what changed
@@ -100,7 +100,7 @@ Before submitting, ensure:
 
 3. **Test thoroughly**
    ```bash
-   npm test -- --run
+   bun run test --run
    ```
 
 4. **Commit with clear messages**
@@ -140,10 +140,10 @@ git clone https://github.com/LuxAlgo/PineTS.git
 cd PineTS
 
 # Install dependencies
-npm install
+bun install
 
 # Run tests to verify setup
-npm test -- --run
+bun run test --run
 ```
 
 ### Adding New Functions
@@ -174,35 +174,35 @@ npm test -- --run
 
 4. **Regenerate barrel file** (only needed for some namespaces check package.json scripts)
    ```bash
-   npm run generate:ta-index
+   bun run generate:ta-index
    ```
 
 5. **Run tests**
    ```bash
-   npm test -- yourfunction.test.ts --run
+   bun run test yourfunction.test.ts --run
    ```
 
 #### For other namespaces:
 
-- **Math**: `npm run generate:math-index`
-- **Array**: `npm run generate:array-index`
-- **Input**: `npm run generate:input-index`
-- **Request**: `npm run generate:request-index`
+- **Math**: `bun run generate:math-index`
+- **Array**: `bun run generate:array-index`
+- **Input**: `bun run generate:input-index`
+- **Request**: `bun run generate:request-index`
 
 ### Running Tests
 
 ```bash
 # Run all tests
-npm test -- --run
+bun run test --run
 
 # Run specific test file
-npm test -- ta-sma.test.ts --run
+bun run test ta-sma.test.ts --run
 
 # Run with coverage
-npm run test:coverage
+bun run test:coverage
 
 # Watch mode (during development)
-npm test
+bun run test
 ```
 
 **Important**: PineTS uses **Vitest**, not Jest. Don't use Jest-specific flags.
@@ -211,10 +211,10 @@ npm test
 
 ```bash
 # Development build
-npm run build:dev:all
+bun run build:dev:all
 
 # Production build
-npm run build:prod:all
+bun run build:prod:all
 ```
 ---
 
@@ -307,7 +307,7 @@ We use Prettier for code formatting:
 
 ```bash
 # Format is automatic on save, or run:
-npx prettier --write .
+bunx --bun prettier --write .
 ```
 
 ---

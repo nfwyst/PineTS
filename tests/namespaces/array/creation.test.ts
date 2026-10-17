@@ -3,7 +3,7 @@ import { Context, PineTS, Provider } from 'index';
 
 describe('Array Creation', () => {
     it('NEW', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'W', 500, 0, new Date('Jan 20 2025').getTime() - 1);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDT', 'W', 500, 0, new Date('Jan 20 2025').getTime() - 1);
 
         const { result } = await pineTS.run((context) => {
             const array = context.array;

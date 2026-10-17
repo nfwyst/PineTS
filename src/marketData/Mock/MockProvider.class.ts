@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { ISymbolInfo } from '@pinets/marketData/IProvider';
-import { BaseProvider } from '@pinets/marketData/BaseProvider';
+import { ISymbolInfo } from '../IProvider';
+import { BaseProvider } from '../BaseProvider';
 import { stripTickerModifier } from '../../tickerModifier';
-import { Kline } from '@pinets/marketData/types';
+import { Kline } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -137,9 +137,13 @@ export class MockProvider extends BaseProvider<MockProviderConfig> {
             return null;
         }
 
-        // If we have date range, find file that contains it
-        if (sDate && eDate) {
-            const containingFile = matchingFiles.find((f) => f.startTime <= sDate && f.endTime >= eDate);
+        // Prefer a fixture that overlaps the requested range. A request may start
+        // before a symbol was listed, in which case the first available bar is valid.
+        if (sDate) {
+            const requestedEnd = eDate ?? sDate;
+            const containingFile = matchingFiles.find((f) =>
+                f.startTime <= requestedEnd && f.endTime >= sDate,
+            );
             if (containingFile) {
                 return containingFile.file;
             }
@@ -169,7 +173,9 @@ export class MockProvider extends BaseProvider<MockProviderConfig> {
 
         // Apply limit
         if (limit && limit > 0) {
-            filtered = filtered.slice(0, limit);
+            filtered = sDate
+                ? filtered.slice(0, limit)
+                : filtered.slice(Math.max(0, filtered.length - limit));
         }
 
         return filtered;
@@ -201,7 +207,7 @@ export class MockProvider extends BaseProvider<MockProviderConfig> {
     }
 
     protected getSupportedTimeframes(): Set<string> {
-        return new Set(['1', '3', '5', '15', '30', '45', '60', '120', '180', '240', 'D', 'W', 'M']);
+        return new Set(['1', '3', '5', '15', '30', '45', '60', '120', '180', '240', 'D', 'W']);
     }
 
     protected aggregatesOnCalendarGrid(): boolean {

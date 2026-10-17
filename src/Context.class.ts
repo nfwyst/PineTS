@@ -10,6 +10,8 @@ import { Session } from './namespaces/Session';
 import { Core, NAHelper, AlertHelper } from './namespaces/Core';
 import { PineColor } from './namespaces/color/PineColor';
 import { TimeHelper, TimeComponentHelper, EXTRACTORS, getDatePartsInTimezone } from './namespaces/Time';
+import { resolveSessionGrid } from './namespaces/sessionSpec';
+import type { SessionGrid } from './namespaces/sessionSpec';
 import { Input } from './namespaces/input/input.index';
 import PineMath from './namespaces/math/math.index';
 import { PineRequest } from './namespaces/request/request.index';
@@ -36,9 +38,13 @@ import { Ticker } from './namespaces/Ticker';
 import { isScalarHelper } from './namespaces/utils';
 import { receiverMatchesMethod } from './namespaces/methodDispatch';
 import { BUILTIN_METHOD_NAMES } from './transpiler/settings';
+import { PINE_VERSION_PROPERTY } from './transpiler/markers';
 import { PineRuntimeError } from './errors/PineRuntimeError';
-import type { IndicatorOptions } from './types/PineTypes';
+import { DEFAULT_CHART_THEME } from './types/PineTypes';
+import type { AlertEvent, IndicatorOptions, ResolvedPineTSOptions } from './types/PineTypes';
+import type { PineTS } from './PineTS.class';
 import { PineArrayObject, PineArrayType } from './namespaces/array/PineArrayObject';
+import { parseTimeframe, timeframeBarRange } from './timeframe';
 
 // Stand-in for an na drawing in getter / setter calls: getters return na (`get_text` and
 // `get_tooltip` the na string), setters and anything else do nothing.
@@ -68,6 +74,7 @@ export class Context {
     public chartTimezone: string | null = null; // Chart display timezone (affects log timestamps only, not computation)
     public chartStyle: string = 'standard'; // Chart type DERIVED from the ticker's chart-type modifier ("SYM;heikinashi") at context init; read by chart.is_*
     public dataVersion: number = 0; // Incremented when market data changes (streaming mode)
+    public _varSnapshot: unknown = undefined;
 
     public __maxLoops: number = 500000;
     public NA: any = NaN;
@@ -75,8 +82,11 @@ export class Context {
     /** Runtime warnings (OOB access, etc.) — non-blocking, script continues. */
     public warnings: { message: string; method?: string; bar: number }[] = [];
 
+    /** Compile-time non-blocking diagnostics (e.g. CW10011 shadowing), attached from the transpiled function before the first bar. */
+    public compileWarnings: { code: string; message: string; line: number; column: number; name?: string }[] = [];
+
     /** Alert events emitted by alert() and alertcondition() calls. */
-    public alerts: { type: string; id: string; message: string; title?: string; freq?: string; bar_index: number; time: number }[] = [];
+    public alerts: AlertEvent[] = [];
 
     /** Alert mode: 'realtime' = only fire on live bars (TV behavior), 'all' = fire on every bar (backtest). */
     public _alertMode: 'realtime' | 'all' = 'realtime';
@@ -89,6 +99,8 @@ export class Context {
     /** Monotonically increasing counter, incremented each time a bar starts executing.
      *  Used by alertcondition/AlertHelper to detect re-execution of the same bar. */
     public _execTick: number = 0;
+    /** Latest execution tick for each bar, used to reject provisional state skipped by a later tick. */
+    public _barExecutionTicks: number[] = [];
 
     /** Emit a runtime warning. The script continues execution (returns na/no-op). */
     public warn(message: string, method?: string): void {
@@ -132,6 +144,7 @@ export class Context {
     public params: any = {};
     public const: any = {};
     public var: any = {};
+    public varip: any = {};
     public let: any = {};
     public lctx: Map<string, any> = new Map();
 
@@ -155,9 +168,47 @@ export class Context {
     public viewportLeft: number | undefined = undefined;
     public viewportRight: number | undefined = undefined;
 
+    /** Validated, per-PineTS-instance host configuration. */
+    public readonly hostOptions: ResolvedPineTSOptions;
+    public readonly createSecondaryPineTS?: (...args: ConstructorParameters<typeof PineTS>) => PineTS;
+
     public pineTSCode: Function | String;
+    /** Prepared function used by request secondaries when no call-site slice exists. */
+    public transpiledFn: Function | null = null;
 
     public inputs: Record<string, any> = {};
+
+    private _sessionGridSource: unknown = undefined;
+    private _sessionGridDataLength = -1;
+    private _sessionGrid: SessionGrid | null = null;
+
+    /** One exchange-session grid shared by all time consumers in this context. */
+    public get sessionGrid(): SessionGrid | null {
+        const syminfo = this.pine?.syminfo;
+        const dataLength = Array.isArray(this.marketData) ? this.marketData.length : -1;
+        if (this._sessionGridSource !== syminfo || this._sessionGridDataLength !== dataLength) {
+            const openTimes = Array.isArray(this.marketData)
+                ? this.marketData.map((bar) => Number(Reflect.get(Object(bar), 'openTime'))).filter(Number.isFinite)
+                : [];
+            this._sessionGrid = resolveSessionGrid(syminfo, openTimes);
+            this._sessionGridSource = syminfo;
+            this._sessionGridDataLength = dataLength;
+        }
+        return this._sessionGrid;
+    }
+
+    /** Complete close-time view; explicit provider closes win over derived grid closes. */
+    public get normalizedCloseTime(): readonly number[] {
+        if (!Array.isArray(this.marketData)) return [];
+        const timeframe = parseTimeframe(this.timeframe);
+        return this.marketData.map((bar) => {
+            const explicit = Reflect.get(Object(bar), 'closeTime');
+            if (typeof explicit === 'number' && Number.isFinite(explicit)) return explicit;
+            const openTime = Number(Reflect.get(Object(bar), 'openTime'));
+            if (!timeframe || !Number.isFinite(openTime)) return NaN;
+            return timeframeBarRange(openTime, timeframe, this.sessionGrid)?.end ?? NaN;
+        });
+    }
 
     constructor({
         marketData,
@@ -169,6 +220,8 @@ export class Context {
         eDate,
         fullContext,
         inputs,
+        hostOptions,
+        createSecondaryPineTS,
     }: {
         marketData: any;
         source: IProvider | any[];
@@ -179,6 +232,8 @@ export class Context {
         eDate?: number;
         fullContext?: Context;
         inputs?: Record<string, any>;
+        hostOptions?: ResolvedPineTSOptions;
+        createSecondaryPineTS?: (...args: ConstructorParameters<typeof PineTS>) => PineTS;
     }) {
         this.marketData = marketData;
         this.source = source;
@@ -189,6 +244,11 @@ export class Context {
         this.eDate = eDate;
         this.fullContext = fullContext || this;
         this.inputs = inputs || {};
+        this.hostOptions = hostOptions ?? Object.freeze({
+            chartTheme: DEFAULT_CHART_THEME,
+            resolveLibrary: undefined,
+        });
+        this.createSecondaryPineTS = createSecondaryPineTS;
         // console.log('Context initialized with inputs keys:', Object.keys(this.inputs));
         // Initialize core functions
         const core = new Core(this);
@@ -287,6 +347,13 @@ export class Context {
                 // TradingView returns 00:00 UTC of the trading day the bar belongs to.
                 // For daily+ timeframes on 24/7 markets, this equals the bar's close date
                 // (i.e. the date the bar settles / completes).
+                const openTime = Series.from(_this.data.openTime).get(0);
+                const chartTimeframe = parseTimeframe(_this.timeframe);
+                const sessionBar = chartTimeframe && _this.sessionGrid
+                    ? timeframeBarRange(openTime, chartTimeframe, _this.sessionGrid)
+                    : null;
+                if (sessionBar) return sessionBar.tradingDay;
+
                 const closeTime = Series.from(_this.data.closeTime).get(0);
                 if (isNaN(closeTime)) return NaN;
                 const timezone = _this.pine?.syminfo?.timezone || 'UTC';
@@ -771,24 +838,12 @@ export class Context {
         return this.typedSeries([value], value);
     }
 
-    /**
-     * this function is used to set the floating point precision of a number
-     * by default it is set to 10 decimals which is the same as pine script
-     * @param n - the number to be precision
-     * @param decimals - the number of decimals to precision to
-     * @returns the precision number
-     */
-    private static readonly PRECISION_EPSILON = 10 ** 10; // Cache default epsilon
-
-    precision(value: number, decimals: number = 10) {
-        if (typeof value !== 'number') return value;
-        const epsilon = decimals === 10 ? Context.PRECISION_EPSILON : 10 ** decimals;
-        // From 2^53 / epsilon on, `value * epsilon` is inexact and the round trip moves the value
-        // (2136215970 -> 2136215969.9999998); such a double has no 10th decimal left to round.
-        if (!(Math.abs(value) * epsilon < 2 ** 53)) return value;
-        return Math.round(value * epsilon) / epsilon;
-        //if (typeof n !== 'number' || isNaN(n)) return n;
-        //return Number(n.toFixed(decimals));
+    /** Preserve Pine's float precision unless an explicit decimal count is requested. */
+    precision(value: number, decimals?: number) {
+        if (typeof value !== 'number' || decimals === undefined) return value;
+        const scale = 10 ** decimals;
+        if (!(Math.abs(value) * scale < 2 ** 53)) return value;
+        return Math.round(value * scale) / scale;
     }
 
     /**
@@ -896,6 +951,8 @@ export class Context {
         // PineMapObject wraps a JS Map as `.map` — iterating yields [key, value]
         // pairs (Pine's `for v in map` semantics).
         if (source.map instanceof Map) return source.map;
+        // Matrix iteration yields copied Pine array rows, matching matrix.row().
+        if (Array.isArray(source.matrix)) return source.matrix.map((_, index) => source.row(index));
         return source;
     }
 
@@ -910,6 +967,7 @@ export class Context {
         if (source == null) return [].entries();
         if (Array.isArray(source.array)) return source.array.entries();
         if (source.map instanceof Map) return source.map.entries();
+        if (Array.isArray(source.matrix)) return source.matrix.map((_, index) => source.row(index)).entries();
         if (Array.isArray(source)) return source.entries();
         // Map / Set / other iterables that already yield tuples
         if (typeof source.entries === 'function') return source.entries();
@@ -973,6 +1031,7 @@ export class Context {
                 let: {},
                 const: {},
                 var: {},
+                varip: {},
             };
             this.lctx.set(id, ctx);
         }
@@ -1006,14 +1065,27 @@ export class Context {
      * @param args - Arguments to pass to the function
      */
     public call(fn: Function, id: string, ...args: any[]) {
+        const pineVersion = Reflect.get(fn, PINE_VERSION_PROPERTY);
+        const previousVersion = this.pineVersion;
+        const hasScopedVersion = typeof pineVersion === 'number';
+        if (hasScopedVersion) this.pineVersion = pineVersion;
+        let restoreSynchronously = hasScopedVersion;
+
         this.pushId(id);
         try {
             const result = fn(...args);
+            if (hasScopedVersion && result instanceof Promise) {
+                restoreSynchronously = false;
+                return result.finally(() => {
+                    this.pineVersion = previousVersion;
+                });
+            }
             // Falling off the end of a Pine function (e.g. an `if` with no `else` whose
             // test was false) yields `na`, not an absent value.
             return result === undefined ? NaN : result;
         } finally {
             this.popId();
+            if (restoreSynchronously) this.pineVersion = previousVersion;
         }
     }
 

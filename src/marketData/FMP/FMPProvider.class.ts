@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { ISymbolInfo, ApiKeyProviderConfig } from '@pinets/marketData/IProvider';
-import { BaseProvider } from '@pinets/marketData/BaseProvider';
+import { ISymbolInfo, ApiKeyProviderConfig } from '../IProvider';
+import { BaseProvider } from '../BaseProvider';
 import { stripTickerModifier } from '../../tickerModifier';
-import { Kline, PeriodType, computeNextPeriodStart, computeSessionClose } from '@pinets/marketData/types';
+import { Kline, PeriodType, computeNextPeriodStart, computeSessionClose, localTimeToUTC } from '../types';
+import { fetchWithTimeout } from '../fetchWithTimeout';
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -265,8 +266,7 @@ export class FMPProvider extends BaseProvider<FMPProviderConfig> {
 
             return klines;
         } catch (error) {
-            console.error('Error in FMPProvider.getMarketData:', error);
-            return [];
+            throw error;
         }
     }
 
@@ -284,7 +284,7 @@ export class FMPProvider extends BaseProvider<FMPProviderConfig> {
         if (sDate) url += `&from=${this._msToDateStr(sDate)}`;
         if (eDate) url += `&to=${this._msToDateStr(eDate)}`;
 
-        const response = await fetch(url);
+        const response = await fetchWithTimeout(url);
         if (!response.ok) {
             const text = await response.text();
             throw new Error(`FMP HTTP ${response.status}: ${text}`);
@@ -346,16 +346,15 @@ export class FMPProvider extends BaseProvider<FMPProviderConfig> {
         if (sDate) url += `&from=${this._msToDateStr(sDate)}`;
         if (eDate) url += `&to=${this._msToDateStr(eDate)}`;
 
-        const response = await fetch(url);
+        const response = await fetchWithTimeout(url);
         if (!response.ok) {
             const text = await response.text();
             // Check for restricted endpoint error (free plan)
             if (response.status === 403 || text.includes('Restricted Endpoint')) {
-                console.error(
+                throw new Error(
                     `FMP: Intraday data (${interval}) requires a paid plan. ` +
-                    `Use daily timeframe ('D') with a free API key, or upgrade at https://financialmodelingprep.com/`
+                    `Use daily timeframe ('D') with a free API key, or upgrade at https://financialmodelingprep.com/`,
                 );
-                return [];
             }
             throw new Error(`FMP HTTP ${response.status}: ${text}`);
         }
@@ -377,7 +376,7 @@ export class FMPProvider extends BaseProvider<FMPProviderConfig> {
         const { session, timezone } = await this._resolveSessionInfo(tickerId);
 
         const klines: Kline[] = bars.map((bar) => {
-            const openTime = this._dateTimeStrToMs(bar.date);
+            const openTime = this._dateTimeStrToMs(bar.date, timezone);
             const closeTime = computeSessionClose(openTime, session, timezone, periodType, multiplier);
 
             return {
@@ -549,7 +548,7 @@ export class FMPProvider extends BaseProvider<FMPProviderConfig> {
         }
 
         const url = `${this._baseUrl}/stable/profile?symbol=${encodeURIComponent(tickerId)}&apikey=${this._apiKey}`;
-        const response = await fetch(url);
+        const response = await fetchWithTimeout(url);
         if (!response.ok) return null;
 
         const data = await response.json();
@@ -565,17 +564,13 @@ export class FMPProvider extends BaseProvider<FMPProviderConfig> {
      * Falls back to NYSE defaults if profile is unavailable.
      */
     private async _resolveSessionInfo(tickerId: string): Promise<{ session: string; timezone: string }> {
-        try {
-            const profile = await this._fetchProfile(tickerId);
-            if (profile) {
-                const exchange = profile.exchange || '';
-                const isCrypto = this._isCrypto(tickerId);
-                const timezone = isCrypto ? 'Etc/UTC' : (EXCHANGE_TIMEZONE[exchange] || 'America/New_York');
-                const session = isCrypto ? '24x7' : (EXCHANGE_SESSION[exchange] || '0930-1600');
-                return { session, timezone };
-            }
-        } catch {
-            // Ignore — fall through to defaults
+        const profile = await this._fetchProfile(tickerId);
+        if (profile) {
+            const exchange = profile.exchange || '';
+            const isCrypto = this._isCrypto(tickerId);
+            const timezone = isCrypto ? 'Etc/UTC' : (EXCHANGE_TIMEZONE[exchange] || 'America/New_York');
+            const session = isCrypto ? '24x7' : (EXCHANGE_SESSION[exchange] || '0930-1600');
+            return { session, timezone };
         }
         return { session: '0930-1600', timezone: 'America/New_York' };
     }
@@ -591,9 +586,8 @@ export class FMPProvider extends BaseProvider<FMPProviderConfig> {
     }
 
     /** Convert FMP datetime string "YYYY-MM-DD HH:MM:SS" to ms timestamp. */
-    private _dateTimeStrToMs(dateTimeStr: string): number {
-        // FMP intraday dates are in exchange local time; treat as UTC for consistency
-        return new Date(dateTimeStr.replace(' ', 'T') + 'Z').getTime();
+    private _dateTimeStrToMs(dateTimeStr: string, timezone: string): number {
+        return localTimeToUTC(dateTimeStr.slice(0, 10), dateTimeStr.slice(11, 16), timezone);
     }
 
     /** Heuristic: forex pairs are exactly 6 uppercase chars (two 3-letter currency codes). */

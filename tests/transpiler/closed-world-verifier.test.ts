@@ -29,6 +29,18 @@ describe('closed-world verifier — rejects host / prototype / internal escapes'
         expect(() => transpile(H + `x = fetch\nplot(close)`)).toThrow(/Undeclared identifier "fetch"/);
     });
 
+    it('does not let a nested parameter authorize an outer reference', () => {
+        const source = H + `f(process) => process\nx = process.version\nplot(close)`;
+
+        expect(() => transpile(source)).toThrow(/Undeclared identifier "process"/);
+    });
+
+    it('does not let a loop binding authorize a reference after the loop', () => {
+        const source = H + `for process = 0 to 1\n    x = process\ny = process.version\nplot(close)`;
+
+        expect(() => transpile(source)).toThrow(/Undeclared identifier "process"/);
+    });
+
     it('rejects the Function constructor by name', () => {
         expect(() => transpile(H + `f = Function('return 1')\nplot(close)`)).toThrow(/Undeclared identifier "Function"/);
     });
@@ -89,6 +101,7 @@ describe('closed-world verifier — does not break legitimate scripts', () => {
         H + `a = array.new_float(0)\narray.push(a, close)\nplot(array.size(a))`,
         H + `n = array.size(box.all)\nplot(n)`,
         H + `x = 1\nfor i = 0 to 3\n    x := x + i\nplot(x)`,
+        H + `f(process) => process + 1\nplot(f(2))`,
         `//@version=6
 indicator("t")
 type Bar

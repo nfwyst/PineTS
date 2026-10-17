@@ -13,7 +13,7 @@ async function runMathFunctionWithArgs(mathFunction: string, ...args) {
 
 describe('Math - Basic Operations', () => {
     it('math.abs, math.floor, math.ceil, math.round, math.sign', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, new Date('2018-12-10').getTime(), new Date('2019-01-01').getTime());
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, new Date('2018-12-10').getTime(), new Date('2019-01-01').getTime());
 
         const sourceCode = (context) => {
             const { close, high, low, volume, open } = context.data;

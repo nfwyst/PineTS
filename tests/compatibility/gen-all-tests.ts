@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env bun
 
 /**
  * Generate all tests for namespaces that have indicators folders
@@ -9,7 +9,7 @@
  * 3. Generates tests for all .pine.ts files found
  *
  * Usage:
- *   tsx gen-all-tests.ts
+ *   bun run gen-all-tests.ts
  */
 
 import * as path from 'path';
@@ -229,6 +229,8 @@ for (const [testDir, indicators] of Object.entries(byTestDir)) {
         // Calculate relative path from test file to serializer
         const serializerPath = path.relative(testDirFull, path.join(__dirname, 'lib', 'serializer.js'));
         const serializerImport = serializerPath.replace(/\\/g, '/');
+        const utilsPath = path.relative(testDirFull, path.join(__dirname, '..', 'utils'));
+        const utilsImport = utilsPath.replace(/\\/g, '/');
 
         // Generate consolidated test file
         const testCases = indicators.map((indicator) => {
@@ -257,6 +259,7 @@ import * as path from 'path';
 
 import { Provider } from '@pinets/marketData/Provider.class';
 import { deserialize, deepEqual } from '${serializerImport}';
+import { normalizePlotString } from '${utilsImport}';
 
 describe('${namespaceUpper} Namespace', () => {
 ${testCases
@@ -304,8 +307,8 @@ ${testCase.indicatorBody
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });`
     )
     .join('\n\n')}
@@ -342,5 +345,5 @@ if (failCount > 0) {
     console.log('  - consolidated test files: namespace/*/methods/*.test.ts');
     console.log();
     console.log('Run all tests with:');
-    console.log('  npm test -- tests/compatibility/namespace');
+    console.log('  bun run test tests/compatibility/namespace');
 }

@@ -1,90 +1,157 @@
 import { Provider } from '@pinets/index';
 import PineTS from 'PineTS.class';
 import { describe, expect, it } from 'vitest';
+import type { Context } from '../../src/Context.class';
+import type { IProvider } from '../../src/marketData/IProvider';
+import type { Kline } from '../../src/marketData/types';
+
+const MINUTE = 60_000;
+
+function candle(index: number, close: number): Kline {
+    return {
+        openTime: index * MINUTE,
+        closeTime: (index + 1) * MINUTE - 1,
+        open: close,
+        high: close,
+        low: close,
+        close,
+        volume: 1,
+        quoteAssetVolume: 0,
+        numberOfTrades: 0,
+        takerBuyBaseAssetVolume: 0,
+        takerBuyQuoteAssetVolume: 0,
+        ignore: 0,
+    };
+}
 
 describe('Stream API', () => {
-    it('should stream data via event interface', async () => {
-        return new Promise<void>((resolve, reject) => {
-            const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'D', 100);
+    it('preserves explicit positive pageSize pagination', async () => {
+        const data: Kline[] = Array.from({ length: 5 }, (_, index) => ({
+            openTime: index * 60_000,
+            closeTime: (index + 1) * 60_000 - 1,
+            open: 100 + index,
+            high: 102 + index,
+            low: 99 + index,
+            close: 101 + index,
+            volume: 1_000,
+            quoteAssetVolume: 0,
+            numberOfTrades: 0,
+            takerBuyBaseAssetVolume: 0,
+            takerBuyQuoteAssetVolume: 0,
+            ignore: 0,
+        }));
+        const pageSizes: number[] = [];
 
-            const indicator = (context: any) => {
-                const { close } = context.data;
-                const { ta, math, barstate } = context.pine;
-                const sma = ta.sma(close, 14);
-                let state = barstate.isnew;
-
-                const sum10 = math.sum(close, 10);
-                return { sma, sum10, close, state };
-            };
-
-            // Use larger interval to ensure price changes in mock
-            const evt = pineTS.stream(indicator, { pageSize: 10, live: true, interval: 1000 });
-
-            let pageCount = 0;
-            let distinctCloseValues: any[] = [];
-            let eventsCount = 0;
-
-            let lastTime = Date.now();
-            evt.on('data', (ctx: any) => {
-                eventsCount++;
-                const { sma, close, state } = ctx.result;
-
-                const currentCandle = ctx.marketData[ctx.idx];
-                const isHistorical = currentCandle && currentCandle.closeTime < Date.now();
-
-                if (isHistorical) {
-                    pageCount++;
-                } else {
-                    const currentClose = Array.isArray(close) ? close[close.length - 1] : close;
-                    const currentTime = Date.now();
-                    const timeDiff = currentTime - lastTime;
-                    lastTime = currentTime;
-                    console.log('currentClose', currentClose, 'timeDiff', timeDiff);
-
-                    // Only collect if different from last (to verify we get updates)
-                    if (distinctCloseValues.length === 0 || distinctCloseValues[distinctCloseValues.length - 1] !== currentClose) {
-                        distinctCloseValues.push(currentClose);
-                    }
-
-                    // Stop after collecting 3 distinct live updates
-                    if (distinctCloseValues.length >= 3) {
-                        evt.stop();
-
-                        try {
-                            expect(pageCount).toBeGreaterThan(0);
-                            expect(distinctCloseValues.length).toBeGreaterThanOrEqual(3);
-                            resolve();
-                        } catch (e) {
-                            reject(e);
-                        }
-                    }
+        await new Promise<void>((resolve, reject) => {
+            const stream = new PineTS(data).stream('//@version=5\nindicator("x")\nplot(close, "c")', {
+                pageSize: 2,
+                live: false,
+            });
+            stream.on('error', reject);
+            stream.on('data', (context: Context) => {
+                pageSizes.push(context.result.length);
+                if (pageSizes.reduce((total, size) => total + size, 0) === data.length) {
+                    queueMicrotask(() => {
+                        stream.stop();
+                        resolve();
+                    });
                 }
             });
+        });
 
-            evt.on('error', (error: any) => {
+        expect(pageSizes).toEqual([2, 2, 1]);
+    }, 2_000);
+
+    it.each([
+        { label: 'replacing the last bar', updateIndex: 2, updateClose: 3.5, expected: [3], expectedIsNew: [0] },
+        { label: 'appending a live bar', updateIndex: 3, updateClose: 4, expected: [4], expectedIsNew: [1] },
+    ])('rolls back a sole final page before $label', async ({ updateIndex, updateClose, expected, expectedIsNew }) => {
+        let updateCount = 0;
+        const provider: IProvider = {
+            async getMarketData(_tickerId, _timeframe, _limit, startDate) {
+                if (startDate === undefined) return [candle(0, 1), candle(1, 2), candle(2, 3)];
+                return updateCount++ === 0 ? [candle(updateIndex, updateClose)] : [];
+            },
+            getSymbolInfo: (tickerId) => Provider.Mock.getSymbolInfo(tickerId),
+            configure: () => undefined,
+        };
+        const pages: number[][] = [];
+        const isNewPages: number[][] = [];
+
+        await new Promise<void>((resolve, reject) => {
+            const stream = new PineTS(provider, 'BTCUSDC', '1').stream(`//@version=6
+indicator("paged live rollback")
+var int executions = 0
+executions += 1
+plot(executions, "executions")
+plot(barstate.isnew ? 1 : 0, "isnew")`, { pageSize: 2, live: true, interval: 0 });
+            const timeout = setTimeout(() => {
+                stream.stop();
+                reject(new Error('paged live rollback timeout'));
+            }, 2_000);
+            stream.on('error', (error) => {
+                clearTimeout(timeout);
+                stream.stop();
                 reject(error);
             });
-
-            // Fail-safe timeout
-            setTimeout(() => {
-                evt.stop();
-                if (distinctCloseValues.length >= 1) {
-                    // If we got at least some updates, maybe mock is slow/static, but it works
-                    // But strictly we want to see changes.
-                    // If mock is static, we can't test "changes".
-                    // But livestream.test.ts passes, so it must change.
-                    console.warn(`Got ${distinctCloseValues.length} distinct values, ${eventsCount} total events.`);
-                    resolve(); // Pass if we at least got something running
-                } else {
-                    reject(new Error(`Test timed out. Got ${eventsCount} events, ${distinctCloseValues.length} distinct.`));
+            stream.on('data', (context) => {
+                pages.push(context.plots.executions.data.map((point: { readonly value: number }) => point.value));
+                isNewPages.push(context.plots.isnew.data.map((point: { readonly value: number }) => point.value));
+                if (pages.length === 3) {
+                    clearTimeout(timeout);
+                    stream.stop();
+                    resolve();
                 }
-            }, 10000);
+            });
         });
-    }, 20000);
+
+        expect(pages).toEqual([[1, 2], [3], expected]);
+        expect(isNewPages).toEqual([[1, 1], [1], expectedIsNew]);
+    }, 3_000);
+
+    it('should stream data via event interface', async () => {
+        let updateCount = 0;
+        const provider: IProvider = {
+            async getMarketData(_tickerId, _timeframe, _limit, startDate) {
+                if (startDate === undefined) return [candle(0, 1), candle(1, 2)];
+                if (updateCount++ === 0) return [candle(1, 3)];
+                return [candle(2, 4)];
+            },
+            getSymbolInfo: (tickerId) => Provider.Mock.getSymbolInfo(tickerId),
+            configure: () => undefined,
+        };
+        const pages: number[][] = [];
+
+        await new Promise<void>((resolve, reject) => {
+            const stream = new PineTS(provider, 'BTCUSDC', '1').stream(
+                '//@version=6\nindicator("event stream")\nplot(close, "c")',
+                { pageSize: 2, live: true, interval: 0 },
+            );
+            const timeout = setTimeout(() => {
+                stream.stop();
+                reject(new Error('event stream timeout'));
+            }, 2_000);
+            stream.on('error', (error) => {
+                clearTimeout(timeout);
+                stream.stop();
+                reject(error);
+            });
+            stream.on('data', (context) => {
+                pages.push(context.plots.c.data.map((point: { readonly value: number }) => point.value));
+                if (pages.length === 3) {
+                    clearTimeout(timeout);
+                    stream.stop();
+                    resolve();
+                }
+            });
+        });
+
+        expect(pages).toEqual([[1, 2], [3], [4]]);
+    }, 3_000);
 
     it('should respect live=false option', async () => {
         return new Promise<void>((resolve, reject) => {
-            const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'D', 100);
+            const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'D', 100);
 
             const indicator = (context: any) => {
                 const { close } = context.data;
@@ -123,7 +190,7 @@ describe('Stream API', () => {
     it('should produce consistent results between streaming and non-streaming execution', async () => {
         const periods = 1500;
         // Use consistent provider and symbol
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', '60', periods);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', '60', periods);
         
         // Wait for data to be ready (ensure we have data for run() later)
         // Note: stream() usually handles init, but run() might need it if called separately.

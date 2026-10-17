@@ -132,7 +132,7 @@ Use the provided scripts to fetch and save market data:
 
 ```bash
 cd tests/compatibility/_data
-npx tsx market.ts
+bun run market.ts
 ```
 
 This creates: `BTCUSDC-1h-1704067200000-1763683199000.json`
@@ -141,7 +141,7 @@ This creates: `BTCUSDC-1h-1704067200000-1763683199000.json`
 
 ```bash
 cd tests/compatibility/_data
-npx tsx fetch-daily.ts
+bun run fetch-daily.ts
 ```
 
 This creates: `BTCUSDC-1d-1704067200000-1763683199000.json`

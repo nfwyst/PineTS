@@ -102,7 +102,7 @@ Run `gen-test.ts` from the `tests/compatibility` directory:
 
 ```bash
 cd tests/compatibility
-tsx gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts
+bun run gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts
 ```
 
 This will automatically:
@@ -114,7 +114,7 @@ This will automatically:
 ### 3. Run the Test
 
 ```bash
-npm test -- tests/compatibility/namespace/ta/methods/sma.test.ts
+bun run test tests/compatibility/namespace/ta/methods/sma.test.ts
 ```
 
 ## Complete Example: EMA Test
@@ -149,7 +149,7 @@ File: `namespace/ta/methods/indicators/ema.pine.ts`
 
 ```bash
 cd tests/compatibility
-tsx gen-test.ts namespace/ta/methods/indicators/ema.pine.ts namespace/ta/methods/ema.test.ts
+bun run gen-test.ts namespace/ta/methods/indicators/ema.pine.ts namespace/ta/methods/ema.test.ts
 ```
 
 Output:
@@ -174,7 +174,7 @@ Step 3: Generating test file...
 ### Step 3: Run Test
 
 ```bash
-npm test -- tests/compatibility/namespace/ta/methods/ema.test.ts
+bun run test tests/compatibility/namespace/ta/methods/ema.test.ts
 ```
 
 ## Indicator Code Requirements
@@ -280,7 +280,7 @@ await generateTest(indicatorPath, testOutputPath);
 
 **As CLI:**
 ```bash
-tsx gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts
+bun run gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts
 ```
 
 The generator:
@@ -308,7 +308,7 @@ await generateExpectedData(indicatorCode, outputPath);
 
 **As CLI (for manual testing):**
 ```bash
-cat indicator.pine.ts | tsx expect-gen.ts - output.expect.json
+cat indicator.pine.ts | bun run expect-gen.ts - output.expect.json
 ```
 
 Runs the indicator against:
@@ -336,7 +336,7 @@ If you need to update a test (e.g., after fixing a bug or changing test cases):
 
 ```bash
 cd tests/compatibility
-tsx gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts
+bun run gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts
 ```
 
 This overwrites both `sma.test.ts` and `sma.expect.json`.
@@ -346,7 +346,7 @@ This overwrites both `sma.test.ts` and `sma.expect.json`.
 If you only want to update the expected data (keeping the test file as-is), you can use `expect-gen.ts` directly:
 
 ```bash
-cat namespace/ta/methods/indicators/sma.pine.ts | tsx expect-gen.ts - namespace/ta/methods/sma.expect.json
+cat namespace/ta/methods/indicators/sma.pine.ts | bun run expect-gen.ts - namespace/ta/methods/sma.expect.json
 ```
 
 **Note:** This is rarely needed since `gen-test.ts` is very fast now (uses direct function calls, not subprocesses).
@@ -386,7 +386,7 @@ cat namespace/ta/methods/indicators/sma.pine.ts | tsx expect-gen.ts - namespace/
 
 ```bash
 cd tests/compatibility
-tsx gen-test.ts namespace/ta/methods/indicators/{method}.pine.ts namespace/ta/methods/{method}.test.ts
+bun run gen-test.ts namespace/ta/methods/indicators/{method}.pine.ts namespace/ta/methods/{method}.test.ts
 ```
 
 ### Test Fails: "Cannot read properties of undefined"
@@ -456,7 +456,7 @@ const sma_short = ta.sma(close, 5); // Different parameter
 After regenerating tests, always run them:
 
 ```bash
-npm test -- tests/compatibility/namespace/ta/methods/{method}.test.ts
+bun run test tests/compatibility/namespace/ta/methods/{method}.test.ts
 ```
 
 ## Advanced Usage
@@ -467,7 +467,7 @@ Use `gen-all-tests.ts` to regenerate all compatibility tests across all namespac
 
 ```bash
 cd tests/compatibility
-tsx gen-all-tests.ts
+bun run gen-all-tests.ts
 ```
 
 **Performance:** Generates all 64 tests in approximately **30-40 seconds** using optimized module imports (no subprocess spawning).
@@ -526,13 +526,13 @@ The `gen-test.ts` script automatically detects the namespace from the path:
 
 ```bash
 # TA namespace
-tsx gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts
+bun run gen-test.ts namespace/ta/methods/indicators/sma.pine.ts namespace/ta/methods/sma.test.ts
 
 # Math namespace
-tsx gen-test.ts namespace/math/methods/indicators/abs.pine.ts namespace/math/methods/abs.test.ts
+bun run gen-test.ts namespace/math/methods/indicators/abs.pine.ts namespace/math/methods/abs.test.ts
 
 # Array namespace
-tsx gen-test.ts namespace/array/methods/indicators/sum.pine.ts namespace/array/methods/sum.test.ts
+bun run gen-test.ts namespace/array/methods/indicators/sum.pine.ts namespace/array/methods/sum.test.ts
 ```
 
 ### Selective Batch Generation
@@ -544,7 +544,7 @@ Generate tests for specific methods only:
 # Generate tests for moving averages only
 METHODS="sma ema rma wma vwma"
 for method in $METHODS; do
-    tsx gen-test.ts namespace/ta/methods/indicators/$method.pine.ts namespace/ta/methods/$method.test.ts
+    bun run gen-test.ts namespace/ta/methods/indicators/$method.pine.ts namespace/ta/methods/$method.test.ts
 done
 ```
 

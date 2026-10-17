@@ -101,6 +101,44 @@ describe('var / varip with a type qualifier', () => {
             )
         ).toEqual({ v: [8, 9, 10, 11, 12] });
     });
+
+    it.each(['var', 'varip'] as const)('persists %s declarations inside a switch expression', async (mode) => {
+        // Given / When
+        const values = await firstValues(
+            [
+                'float v = switch',
+                '    bar_index >= 0 =>',
+                `        ${mode} int ticks = 0`,
+                '        ticks += 1',
+                '        ticks',
+            ],
+            ['v'],
+        );
+
+        // Then
+        expect(values).toEqual({ v: [1, 2, 3, 4, 5] });
+    });
+
+    it('isolates persistent declarations with the same name across switch arms', async () => {
+        // Given / When
+        const values = await firstValues(
+            [
+                'float v = switch bar_index % 2',
+                '    0 =>',
+                '        var int ticks = 0',
+                '        ticks += 1',
+                '        ticks',
+                '    =>',
+                '        varip int ticks = 100',
+                '        ticks += 10',
+                '        ticks',
+            ],
+            ['v'],
+        );
+
+        // Then
+        expect(values).toEqual({ v: [1, 110, 2, 120, 3] });
+    });
 });
 
 describe('a variable and a user function with the same name', () => {

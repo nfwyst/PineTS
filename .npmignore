@@ -21,10 +21,8 @@ config.json
 docs/
 README.md
 
-# Ignore lock files and build artifacts
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
+# Ignore Bun's development lockfile and build artifacts
+bun.lock
 
 # Ignore TypeScript source files (since you're publishing compiled files)
 src/

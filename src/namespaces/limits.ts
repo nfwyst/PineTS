@@ -29,6 +29,11 @@ export function assertElementCount(count: number, method: string): void {
     }
 }
 
+/** Guard a collection mutation before it increases the stored element count. */
+export function assertCollectionGrowth(currentCount: number, addedCount: number, method: string): void {
+    assertElementCount(currentCount + addedCount, method);
+}
+
 /**
  * Maximum number of distinct secondary contexts (one per unique
  * symbol/timeframe/expression) a single run may create through `request.*()`.

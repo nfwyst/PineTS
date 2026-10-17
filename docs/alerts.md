@@ -103,7 +103,7 @@ hline(30, "Oversold")
 After execution, alerts are available on the returned context object:
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 const pine = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 100);
 
@@ -129,7 +129,7 @@ for (const a of ctx.alerts) {
 In streaming mode, alerts are emitted as `'alert'` events in real time:
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 const pine = new PineTS(Provider.Binance, 'BTCUSDT', '1m', 100);
 
@@ -165,13 +165,31 @@ Each alert event (whether from `alert()` or `alertcondition()`) has this shape:
 ```typescript
 {
     type: 'alert' | 'alertcondition',
-    message: string,          // The alert message
+    id: string,               // Stable call-site identifier
+    message: unknown,         // String in Pine source; any value in PineTS functions
     title?: string,           // Title (alertcondition only)
     freq?: string,            // Frequency constant (alert only)
     bar_index: number,        // Bar index where the alert fired
     time: number              // Bar open time (ms timestamp)
 }
 ```
+
+### PineTS Object Messages
+
+Native Pine source keeps TradingView's string-only contract for `alert()` and `alertcondition()` messages. As a PineTS-only extension, a JavaScript/TypeScript function can pass an object (or any other JavaScript value) to `alert.any()`:
+
+```typescript
+const ctx = await pine.run(($) => {
+    const payload = { alert: 'RSI above 70', nested: { values: [70, 71] } };
+    $.pine.alert.any(payload, $.pine.alert.freq_all);
+    return { payload };
+});
+
+const event = ctx.alerts[0];
+console.log(event.message === ctx.result.payload.at(-1)); // true
+```
+
+`AlertEvent.message` is typed as `unknown`, so consumers must narrow it before reading properties. PineTS does not clone, freeze, or serialize an object message: `run()` results, alert history, and stream listeners receive the same reference. The caller owns that mutable object; mutating it after emission is visible through every retained reference.
 
 ---
 
@@ -218,7 +236,7 @@ for (const a of ctx.alerts) {
 ### Example 1: Webhook-Ready Live Alerts
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 const pine = new PineTS(Provider.Binance, 'BTCUSDT', '5', 200);
 
@@ -260,7 +278,7 @@ evt.on('data', (ctx) => {
 ### Example 2: Backtest Signal Analysis
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 async function backtestAlerts() {
     const pine = new PineTS(Provider.Binance, 'BTCUSDT', 'D', undefined, new Date('2024-01-01').getTime(), new Date('2024-12-31').getTime());
@@ -296,7 +314,7 @@ backtestAlerts();
 ### Example 3: Custom Data with Alerts
 
 ```typescript
-import { PineTS } from 'pinets';
+import { PineTS } from '@nfwyst/pinets';
 
 const data = [
     { openTime: Date.now() - 86400000 * 5, open: 100, high: 110, low: 95, close: 105, volume: 1000, closeTime: Date.now() - 86400000 * 4 },

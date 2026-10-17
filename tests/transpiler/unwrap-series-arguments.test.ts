@@ -100,6 +100,24 @@ plot(na(l) ? na : (time - l.get_x1()) / 3600000, "age")`, ', max_lines_count = 5
         for (const { i, mark } of sinceMark(time, 10)) if (mark > 0) expect(age[i]).toBe(i - mark + 1);
     });
 
+    it('a function-returned time tuple equals the assigned-local tuple (item 23)', async () => {
+        const { series } = await run(`bare() => [time, time_close, hour]
+local() =>
+    t = time
+    tc = time_close
+    h = hour
+    [t, tc, h]
+[bareTime, bareClose, bareHour] = bare()
+[localTime, localClose, localHour] = local()
+plot(bareTime - localTime, "time delta")
+plot(bareClose - localClose, "close delta")
+plot(bareHour - localHour, "hour delta")`);
+
+        for (const title of ['time delta', 'close delta', 'hour delta']) {
+            expect(series(title).every((value: number) => value === 0), title).toBe(true);
+        }
+    });
+
     it('dual-use built-ins as request.security tuple elements (item 23)', async () => {
         const { series, time } = await run(`[t1, t2, h] = request.security(syminfo.tickerid, "240", [time, time_close, hour], lookahead = barmerge.lookahead_on)
 plot((time - t1) / 3600000, "since open")

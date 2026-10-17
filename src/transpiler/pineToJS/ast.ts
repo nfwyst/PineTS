@@ -4,14 +4,63 @@
 // AST Node Definitions for PineScript
 // These will be transformed to ESTree format
 
+export interface SourcePosition {
+    readonly line: number;
+    readonly column: number;
+}
+
+export interface SourceSpan {
+    readonly start: SourcePosition;
+    readonly end: SourcePosition;
+}
+
+export type LibraryExportKind = 'function' | 'type' | 'enum' | 'const';
+
+export interface LibraryExportDescriptor {
+    readonly kind: LibraryExportKind;
+    readonly name: string;
+    readonly sourceSpan: SourceSpan;
+}
+
+export interface LibraryImportDescriptor {
+    readonly user: string;
+    readonly name: string;
+    readonly version: number;
+    readonly alias: string;
+    readonly sourceSpan: SourceSpan;
+}
+
 export class ASTNode {
+    public exported?: boolean;
+    public sourceSpan?: SourceSpan;
+
     constructor(public type: string) {}
 }
 
 // Program root
 export class Program extends ASTNode {
-    constructor(public body: any[]) {
+    constructor(
+        public body: any[],
+        public imports: ImportDeclaration[] = [],
+        public exports: LibraryExportDescriptor[] = [],
+    ) {
         super('Program');
+    }
+}
+
+export class ImportDeclaration extends ASTNode {
+    public readonly user: string;
+    public readonly name: string;
+    public readonly version: number;
+    public readonly alias: string;
+
+    constructor(descriptor: LibraryImportDescriptor) {
+        super('ImportDeclaration');
+        this.user = descriptor.user;
+        this.name = descriptor.name;
+        this.version = descriptor.version;
+        this.alias = descriptor.alias;
+        this.sourceSpan = descriptor.sourceSpan;
     }
 }
 

@@ -15,7 +15,7 @@ async function generateIndex() {
         // Read getters directory (if it exists)
         let getters = [];
         try {
-            const getterFiles = await readdir(gettersDir);
+            const getterFiles = (await readdir(gettersDir)).sort();
             getters = getterFiles.filter((f) => f.endsWith('.ts') && f !== 'math.index.ts' && f !== 'index.ts').map((f) => f.replace('.ts', ''));
         } catch (error) {
             // Getters directory doesn't exist, that's fine
@@ -23,7 +23,7 @@ async function generateIndex() {
         }
 
         // Read methods directory
-        const methodFiles = await readdir(methodsDir);
+        const methodFiles = (await readdir(methodsDir)).sort();
         const methods = methodFiles
             .filter((f) => f.endsWith('.ts'))
             .map((f) => f.replace('.ts', ''));
@@ -49,7 +49,7 @@ async function generateIndex() {
         // Generate the class
         const classCode = `// SPDX-License-Identifier: AGPL-3.0-only
 // This file is auto-generated. Do not edit manually.
-// Run: npm run generate:math-index
+// Run: bun run generate:math-index
 
 ${getterImports ? getterImports + '\n' : ''}${methodImports}
 

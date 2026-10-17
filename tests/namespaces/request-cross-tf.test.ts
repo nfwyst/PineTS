@@ -88,7 +88,7 @@ describe('request.security barmerge string enum handling', () => {
         const eDate = new Date('2019-02-04').getTime();
         const warmup = 365 * 24 * 60 * 60 * 1000;
 
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate - warmup);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate - warmup, eDate);
 
         const { plots } = await pineTS.run(
 `//@version=5
@@ -154,7 +154,7 @@ describe('request.security Cross-TF Correctness', () => {
         const eDate = new Date('2019-02-10').getTime();
         const warmup = 365 * 24 * 60 * 60 * 1000;
 
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate - warmup, eDate);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate - warmup, eDate);
 
         const { plots } = await pineTS.run(
 `//@version=5
@@ -187,7 +187,7 @@ plot(dailyClose1, "dc1")
         const eDate = new Date('2019-01-10').getTime();
 
         // '60' is the canonical 1h timeframe
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', '60', null, sDate, eDate);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', '60', null, sDate, eDate);
 
         const { plots } = await pineTS.run(
 `//@version=5

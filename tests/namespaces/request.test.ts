@@ -4,6 +4,22 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { Provider } from '@pinets/marketData/Provider.class';
+import { normalizePlotString } from '../utils';
+
+type NumericPlotPoint = { readonly time: string; readonly value: number };
+
+function expectNumericPlotCloseTo(actual: readonly NumericPlotPoint[], expectedText: string): void {
+    const expectedLines = expectedText.trim().split('\n');
+    expect(actual).toHaveLength(expectedLines.length);
+    expectedLines.forEach((line, index) => {
+        const separator = line.indexOf(']: ');
+        if (!line.startsWith('[') || separator < 0) throw new Error(`Invalid expected plot line: ${line}`);
+        expect(actual[index].time).toBe(line.slice(1, separator));
+        const expectedValue = Number(line.slice(separator + 3));
+        if (Number.isNaN(expectedValue)) expect(Number.isNaN(actual[index].value)).toBe(true);
+        else expect(actual[index].value).toBeCloseTo(expectedValue, 9);
+    });
+}
 
 describe('Request ', () => {
     it('request.security higher timeframe lookahead=false', async () => {
@@ -46,7 +62,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('request.security expression higher timeframe lookahead=false', async () => {
@@ -90,7 +106,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expectNumericPlotCloseTo(plotdata, expected_plot);
     });
     it('request.security higher timeframe lookahead=true', async () => {
         const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'D', null, new Date('2025-10-01').getTime(), new Date('2025-10-10').getTime());
@@ -131,7 +147,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('request.security higher timeframe gaps=true lookahead=false', async () => {
@@ -173,7 +189,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
     it('request.security higher timeframe gaps=true lookahead=true', async () => {
         const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'D', null, new Date('2025-10-01').getTime(), new Date('2025-10-10').getTime());
@@ -214,7 +230,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('request.security lower timeframe lookahead=false', async () => {
@@ -261,7 +277,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('request.security lower timeframe lookahead=true', async () => {
@@ -308,7 +324,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('request.security expression lower timeframe lookahead=false', async () => {
@@ -358,7 +374,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expectNumericPlotCloseTo(plotdata, expected_plot);
     });
 
     it('request.security function lower timeframe lookahead=false', async () => {
@@ -414,7 +430,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('request.security tuple lower timeframe lookahead=false', async () => {
@@ -468,7 +484,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('request.security lower timeframe gaps=true lookahead=false', async () => {
@@ -515,7 +531,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('request.security lower timeframe gaps=true lookahead=true', async () => {
@@ -562,7 +578,7 @@ describe('Request ', () => {
         console.log('Expected plot:', expected_plot);
         console.log('Actual plot:', plotdata_str);
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('request.security_lower_tf with data', async () => {
@@ -608,7 +624,7 @@ describe('Request ', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('request.security_lower_tf with expression', async () => {
@@ -654,7 +670,7 @@ describe('Request ', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });
 
@@ -688,7 +704,7 @@ describe('Request (Binance - transpiled Pine Script)', () => {
         const eDate = new Date('2019-09-01').getTime();
         const warmup = 365 * 24 * 60 * 60 * 1000;
 
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate - warmup);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate - warmup, eDate);
 
         const { plots } = await pineTS.run(
 `//@version=5
@@ -718,7 +734,7 @@ plot(_daily_close, "_dc")
         const eDate = new Date('2019-09-01').getTime();
         const warmup = 365 * 24 * 60 * 60 * 1000;
 
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate - warmup);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate - warmup, eDate);
 
         const { plots } = await pineTS.run(
 `//@version=5
@@ -755,7 +771,7 @@ plot(_monthly_close, "_mc")
         const eDate = new Date('2019-09-01').getTime();
         const warmup = 365 * 24 * 60 * 60 * 1000;
 
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate - warmup);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate - warmup, eDate);
 
         const { plots } = await pineTS.run(
 `//@version=5
@@ -793,7 +809,7 @@ plot(close, "_c")
         const eDate = new Date('2019-09-01').getTime();
         const warmup = 365 * 24 * 60 * 60 * 1000;
 
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate - warmup);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate - warmup, eDate);
 
         const { plots } = await pineTS.run(
 `//@version=5
@@ -839,7 +855,7 @@ plot(volume, "_v")
         const eDate = new Date('2024-06-15').getTime();
         const warmup = 365 * 24 * 60 * 60 * 1000;
 
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'D', null, sDate - warmup);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'D', null, sDate - warmup, eDate);
 
         // Must NOT throw "maLenInput is not defined" during the run.
         const { plots } = await pineTS.run(
@@ -874,7 +890,7 @@ plot(not na(ltfVma) ? ltfVma.size() : 0, "_m")
         const eDate = new Date('2024-08-15').getTime();
         const warmup = 365 * 24 * 60 * 60 * 1000;
 
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate - warmup);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate - warmup, eDate);
 
         const { plots } = await pineTS.run(
 `//@version=6

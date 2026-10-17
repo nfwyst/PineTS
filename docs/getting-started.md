@@ -17,7 +17,7 @@ It preserves the original functionality and behavior while providing robust hand
 ## Installation
 
 ```bash
-npm install pinets
+bun add @nfwyst/pinets
 ```
 
 ## Usage Examples
@@ -27,7 +27,7 @@ npm install pinets
 Starting with v0.7.0, you can run original Pine Script code directly without conversion:
 
 ```javascript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 // Initialize with market data
 const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 100);
@@ -59,7 +59,7 @@ const { result, plots } = await pineTS.run(pineScriptCode);
 You can pass dynamic values to your indicator's `input()` functions at runtime using the `Indicator` class. This allows you to change parameters without modifying the code.
 
 ```javascript
-import { PineTS, Provider, Indicator } from 'pinets';
+import { PineTS, Provider, Indicator } from '@nfwyst/pinets';
 
 const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 100);
 
@@ -127,7 +127,7 @@ _oo = math.abs(open[1] - close[2]);
 #### Running PineTS Syntax Code
 
 ```javascript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 // Initialize with market data
 const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 100);
@@ -157,7 +157,7 @@ const { result } = await pineTS.run((context) => {
 For processing large datasets efficiently or handling live data streams, use the `stream()` method:
 
 ```javascript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 // Initialize with a provider
 const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '1m', 100);
@@ -259,4 +259,4 @@ After getting started, try exploring our demo indicators:
 - [WillVixFix Indicator](../indicators/willvixfix/index.html)
 - [Squeeze Momentum Indicator](../indicators/sqzmom/index.html)
 
-Or contribute to the project on [GitHub](https://github.com/LuxAlgo/PineTS)!
+Or contribute to the project on [GitHub](https://github.com/nfwyst/PineTS)!

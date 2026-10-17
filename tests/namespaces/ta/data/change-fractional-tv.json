@@ -1,0 +1,14 @@
+{
+    "oracle": {
+        "source": "https://github.com/LuxAlgo/PineTS/issues/267 section 1.2, independently cross-verified on TradingView by the reporter",
+        "tradingViewRule": "ta.change(close, 40 / 3) uses close - close[13] because fractional series indexes are rounded down",
+        "handCalculation": "For each bar i, expected change is close[i] - close[i - floor(length[i])]; null marks insufficient history",
+        "issueSnapshotSha256": "c735469c154b06335d29dba5ad68f6682722fd94aecbe100a64e5ec7055c8b11"
+    },
+    "closes": [100, 102, 101, 105, 104, 110, 108, 115, 111, 119, 117, 123, 120, 130, 127, 136, 132, 141, 139, 150],
+    "fractionalLength": 13.333333333333334,
+    "normalizedLength": 13,
+    "change13": [null, null, null, null, null, null, null, null, null, null, null, null, null, 30, 25, 35, 27, 37, 29, 42],
+    "seriesLengths": [2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+    "seriesChange": [null, null, 1, 5, 3, 9, 4, 11, 3, 11, 6, 12, 3, 13, 7, 16, 5, 14, 7, 18]
+}

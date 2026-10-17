@@ -25,7 +25,7 @@ The `stream()` method unifies pagination and live streaming into a single, easy-
 ### Basic Usage
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '1m');
 
@@ -103,7 +103,7 @@ evt.on('data', (ctx) => {
 
 | Option     | Type      | Default           | Description                                                                                    |
 | :--------- | :-------- | :---------------- | :--------------------------------------------------------------------------------------------- |
-| `pageSize` | `number`  | `undefined` (all) | Number of bars per chunk. If not specified, processes all available historical data in one go. |
+| `pageSize` | `number`  | `undefined` (all) | Positive integer bars per chunk. If not specified, processes all available historical data in one go. |
 | `live`     | `boolean` | `true`            | Whether to continue fetching live data after processing historical data.                       |
 | `interval` | `number`  | `1000`            | Polling interval in milliseconds for live data.                                                |
 

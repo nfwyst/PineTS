@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PineTS, Provider } from 'index';
+import { normalizePlotString } from '../utils';
 
 describe('Core - UDT', () => {
     it('UDT', async () => {
@@ -60,7 +61,7 @@ describe('Core - UDT', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('UDT Pine Script source', async () => {
@@ -120,7 +121,7 @@ plotchar(res, '_plot')
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
     it('UDT - copy', async () => {
         const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, new Date('2018-12-10').getTime(), new Date('2020-01-27').getTime());
@@ -181,7 +182,7 @@ plotchar(res, '_plot')
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
     it('UDT - instance copy', async () => {
         const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, new Date('2018-12-10').getTime(), new Date('2020-01-27').getTime());
@@ -242,7 +243,7 @@ plotchar(res, '_plot')
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('UDT - used in TA function', async () => {
@@ -302,6 +303,6 @@ plotchar(res, '_plot')
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });

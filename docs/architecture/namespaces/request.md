@@ -58,6 +58,6 @@ When `request.security` returns a tuple (e.g., from `[open, close]`), it wraps t
 To regenerate the `request.index.ts` file:
 
 ```bash
-npm run generate:request-index
+bun run generate:request-index
 ```
 

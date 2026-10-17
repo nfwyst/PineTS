@@ -28,7 +28,7 @@ export interface StrategyConfig {
     commission_type?: string;
     commission_value?: number;
     process_orders_on_close?: boolean;
-    close_entries_rule?: string;
+    close_entries_rule?: 'FIFO' | 'ANY';
     margin_long?: number;
     margin_short?: number;
     explicit_plot_zorder?: boolean;
@@ -321,10 +321,15 @@ export interface StrategyState {
         max_position_size?: number;
     };
 
-    // Once max_drawdown / max_intraday_loss / max_cons_loss_days triggers, all
-    // further entries are blocked for the rest of the run (or trading day for
-    // intraday rules — TODO: day rollover detection).
+    // Permanent and day-scoped risk state. Intraday rules reset when the
+    // trading-day key changes; drawdown and consecutive-loss-day halts do not.
     risk_halted: boolean;
+    risk_intraday_halted: boolean;
+    _risk_period_key?: number;
+    _risk_period_start_netprofit: number;
+    _risk_period_max_equity: number;
+    _risk_period_filled_orders: number;
+    _risk_consecutive_loss_days: number;
 
     // Internal: per-callsite cadence tracking for strategy.exit. Keyed by the
     // transpiler-injected __callsiteId; value is the last context.idx the user

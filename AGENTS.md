@@ -22,7 +22,7 @@ PineTS exists to reproduce TradingView's Pine Script behavior **exactly**. A cha
 
 -   **Never assume a function is correct** because the code reads well. Run it and inspect the actual values.
 -   **Never assume your change fixed the bug.** Reproduce the bug first, then prove the fix against that reproduction.
--   **Never assume your change broke nothing.** Run the full suite (`npm test -- --run`) before calling the work done.
+-   **Never assume your change broke nothing.** Run the full suite (`bun run test --run`) before calling the work done.
 -   **The reference for "correct" is TradingView.** When unsure what a Pine function *should* return, run the same script on TradingView and compare. Expected values in tests must come from an independent source of truth — never from "whatever PineTS currently prints."
 
 Everything below — especially **[Testing Discipline](#testing-discipline)** and **[How to Fix a Reported Bug](#how-to-fix-a-reported-bug)** — exists to support this rule.
@@ -261,7 +261,7 @@ return [value1, value2, value3];
 
 ### 8. Precision
 
-Always use `context.precision()` for numeric outputs. It rounds to 10 decimals by default (`Math.round(value * 1e10) / 1e10`), matching TradingView's float behavior:
+Always use `context.precision()` for numeric outputs. Without an explicit decimal count it preserves Pine's internal float precision; APIs whose contract requires decimal rounding pass that count explicitly:
 
 ```typescript
 return context.precision(result);
@@ -271,11 +271,11 @@ return context.precision(result);
 
 ### Build System
 
-The browser/Node test runner uses TypeScript source directly (via `vite-tsconfig-paths`), so unit tests do **not** require a build. You only need a build when testing through a bundled artifact (e.g. browser dist):
+The Bun-hosted Vitest runner uses TypeScript source directly (via `vite-tsconfig-paths`), so unit tests do **not** require a build. You only need a build when testing through a bundled artifact (e.g. browser dist):
 
 ```bash
-npm run build:dev:all     # All dev bundles (CJS, ES, Browser, Browser-ES)
-npm run build:prod:all    # All prod bundles (minified)
+bun run build:dev:all     # All dev bundles (CJS, ES, Browser, Browser-ES)
+bun run build:prod:all    # All prod bundles (minified)
 ```
 
 `build:*:all` first runs every `generate:*-index` script to regenerate namespace barrel files. If you edit a built bundle's behavior, **rebuild before testing the bundle** — a stale bundle is a classic source of "my fix isn't working."
@@ -286,23 +286,23 @@ npm run build:prod:all    # All prod bundles (minified)
 
 ```bash
 # ✅ CORRECT: Run all tests once (non-interactive)
-npm test -- --run
+bun run test --run
 
 # ✅ CORRECT: Run tests whose path matches a substring
-npm test -- ta-stress.test.ts --run
+bun run test ta-stress.test.ts --run
 
 # ✅ CORRECT: Run with coverage
-npm run test:coverage
+bun run test:coverage
 
 # ✅ Watch mode (during local development)
-npm test
+bun run test
 
 # ❌ WRONG: These are Jest flags, not Vitest
-npm test -- --no-watch        # Won't work
-npm test -- --watchAll=false  # Won't work
+bun run test --no-watch        # Won't work
+bun run test --watchAll=false  # Won't work
 ```
 
-(`npm test` runs `vitest --reporter verbose`, which defaults to watch mode in a TTY; `--run` forces a single non-interactive run.)
+(`bun run test` runs `bunx --bun vitest --reporter verbose`, which defaults to watch mode in a TTY; `--run` forces a single non-interactive run.)
 
 ### Adding New TA Functions
 
@@ -312,7 +312,7 @@ npm test -- --watchAll=false  # Won't work
 4. Return `NaN` during the initialization period (insufficient data)
 5. Use `context.precision()` for output
 6. **Write a real test** for it — see **[Testing Discipline](#testing-discipline)**. A `.pine.ts` fixture alone is *not* a test.
-7. **Regenerate the barrel file**: `npm run generate:ta-index` (other namespaces: `generate:math-index`, `generate:array-index`, `generate:input-index`, `generate:request-index`, `generate:map-index`, `generate:matrix-index`)
+7. **Regenerate the barrel file**: `bun run generate:ta-index` (other namespaces: `generate:math-index`, `generate:array-index`, `generate:input-index`, `generate:request-index`, `generate:map-index`, `generate:matrix-index`)
 
 ### File Structure
 
@@ -431,7 +431,7 @@ When a user reports an issue, **do not jump straight to a fix.** Follow this loo
 2.  **Capture it as a *failing* test.** Turn the reproduction into a `*.test.ts` that asserts the **correct** (expected) value, and run it — it must **fail** for the right reason. A bug you can't express as a failing test is a bug you can't prove you fixed. The expected value comes from the reference, not from current PineTS output.
 3.  **Implement the fix** in `src/`.
 4.  **Re-run that test — it must now pass.** If it doesn't, the fix is wrong or incomplete; iterate. (If you're testing a built bundle, rebuild first.)
-5.  **Run the full suite** (`npm test -- --run`) to confirm you didn't break anything else.
+5.  **Run the full suite** (`bun run test --run`) to confirm you didn't break anything else.
 6.  **Keep the test.** It is now a permanent **regression guard**: any future change that reintroduces the bug fails immediately. Commit it alongside the fix.
 
 This **reproduce → fail → fix → pass → guard** loop is the expected workflow for every bug fix, no exceptions.
@@ -538,7 +538,7 @@ Notes:
 
 -   The storage namespace (`$.let` / `$.var` / `$.const`) matches the variable's actual declaration kind; `$.let` above is illustrative.
 -   **TA calls wrap each argument** into its own hoisted temp via `ta.param(...)`, then append the generated call-id literal: `ta.ema(close, 9)` → `const p0 = ta.param(close, …); const p1 = ta.param(9, …); ta.ema(p0, p1, '_ta0')`.
--   **All comparisons** are rewritten to na-aware helpers with a `1e-10` tolerance: `==`/`===` → `__eq`, `!=`/`!==` → `__neq`, `<` → `__lt`, `<=` → `__le`, `>` → `__gt`, `>=` → `__ge`. Relational operators inside `for`/`while` loop headers and the generated loop guard are left as native JS (their operands are integer counters that are never `na`).
+-   **All comparisons** are rewritten to na-aware helpers that round numeric operands to nine fractional digits: `==`/`===` → `__eq`, `!=`/`!==` → `__neq`, `<` → `__lt`, `<=` → `__le`, `>` → `__gt`, `>=` → `__ge`. Relational operators inside `for`/`while` loop headers and the generated loop guard are left as native JS (their operands are integer counters that are never `na`).
 
 ### Scope Prefixes
 
@@ -596,7 +596,7 @@ To see the real prefixes a script produces, transpile it and inspect the generat
 -   Include test coverage for every change
 -   Update documentation if you changed public APIs
 -   Regenerate barrel files if adding namespace methods
--   Ensure all tests pass: `npm test -- --run`
+-   Ensure all tests pass: `bun run test --run`
 
 ## Performance Considerations
 
@@ -654,7 +654,7 @@ See the [Debugging Guide](docs/architecture/debugging.md) for more techniques.
 1.  Reproduce and run it — don't reason about behavior, observe it ([Golden Rule](#golden-rule-verify-dont-assume))
 2.  Read the [Architecture Guide](docs/architecture/index.md) and [Best Practices](docs/architecture/best-practices.md)
 3.  Look at existing implementations in `src/namespaces/ta/methods/`
-4.  Run tests: `npm test -- --run`
+4.  Run tests: `bun run test --run`
 
 ## Summary
 
@@ -669,7 +669,7 @@ See the [Debugging Guide](docs/architecture/debugging.md) for more techniques.
 -   ✅ Incremental calculation with state (not recalculation)
 -   ✅ Always use `_callId` for state isolation; return tuples as `[[...]]`
 -   ✅ Use `context.precision()` for numeric outputs; handle NaN inputs
--   ✅ Run tests with `npm test -- --run`; regenerate barrel files after adding methods
+-   ✅ Run tests with `bun run test --run`; regenerate barrel files after adding methods
 -   ❌ Don't modify the transpiler without deep understanding
 -   ❌ Don't use direct array access for time-series data
 -   ❌ Don't share state between function calls

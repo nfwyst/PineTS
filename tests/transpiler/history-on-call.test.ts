@@ -17,7 +17,7 @@ import { PineTS } from '../../src/PineTS.class';
  * green after the fix (identifier/var history, history-in-arg, and the genuine
  * tuple-destructure path that the fix must not mistake for a history ref).
  *
- * Run: npx vitest run tests/transpiler/history-on-call.test.ts
+ * Run: bunx --bun vitest run tests/transpiler/history-on-call.test.ts
  */
 
 // --- deterministic data (no network); varied OHLC so ta.* changes every bar ---

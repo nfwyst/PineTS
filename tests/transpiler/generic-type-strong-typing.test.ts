@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PineTS, Provider } from 'index';
+import { transpile } from '../../src/transpiler/index';
 
 /**
  * Tests for generic type strong typing: array.new<TYPE>()
@@ -18,6 +19,18 @@ describe('Generic Type Strong Typing', () => {
     // ─── Array ───────────────────────────────────────────────────────
 
     describe('array.new<TYPE> strong typing', () => {
+        it('runs a const array generic declaration', async () => {
+            const code = `
+//@version=6
+indicator("const array")
+const array<bool> flags = array.from(true, false)
+plot(flags.size(), "size")
+`;
+            const { plots } = await pineTS.run(code);
+
+            expect(plots['size'].data[0].value).toBe(2);
+        });
+
         it('array.new<float> allows setting float values (the original bug)', async () => {
             // This was the core bug: array.new<float>(3, 0.0) inferred type as int
             // because 0.0 === 0 in JS, then array.set(arr, 0, 2.1) failed
@@ -37,6 +50,18 @@ plot(array.get(arr, 2), "v2")
             expect(plots['v0'].data[0].value).toBe(2.1);
             expect(plots['v1'].data[0].value).toBe(3.5);
             expect(plots['v2'].data[0].value).toBe(0.7);
+        });
+
+        it.each([
+            ['duplicate', 'const const array<float> values = na', 'Duplicate type qualifier "const" at 3:7'],
+            ['order', 'array<float> const values = na', 'Type qualifier "const" must precede the type at 3:14'],
+        ])('rejects invalid qualifier %s with a stable error', (_case, declaration, error) => {
+            const code = `//@version=6
+indicator("Invalid Qualifier")
+${declaration}
+plot(close)`;
+
+            expect(() => transpile(code)).toThrow(error);
         });
 
         it('array.new<float> with integer initial value accepts floats', async () => {

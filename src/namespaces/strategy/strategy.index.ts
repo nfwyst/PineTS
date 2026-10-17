@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // This file is manually created. Can be auto-generated in the future.
-// TODO: Create npm run generate:strategy-index script
+// TODO: Create bun run generate:strategy-index script
 
 export type { StrategyConfig, StrategyState, Trade, Order } from './types';
 

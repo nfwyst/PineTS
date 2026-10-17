@@ -18,7 +18,7 @@ There are two ways to use a provider:
 **1. Singleton** (from the `Provider` registry):
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 const pine = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 100);
 ```
@@ -26,7 +26,7 @@ const pine = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 100);
 **2. Direct instantiation** (for provider-specific config):
 
 ```typescript
-import { PineTS, BinanceProvider } from 'pinets';
+import { PineTS, BinanceProvider } from '@nfwyst/pinets';
 
 const binance = new BinanceProvider();
 const pine = new PineTS(binance, 'BTCUSDT', 'D', 100);
@@ -47,7 +47,7 @@ The Binance provider fetches cryptocurrency market data. **No API key required.*
 ### Quick Start
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 // Fetch 100 daily BTC candles and compute SMA
 const pine = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 100);
@@ -84,7 +84,7 @@ Timeframes not in this list (e.g., `'45'`, `'180'`) are automatically aggregated
 ### Examples
 
 ```typescript
-import { PineTS, Provider, BinanceProvider } from 'pinets';
+import { PineTS, Provider, BinanceProvider } from '@nfwyst/pinets';
 
 // Using the singleton
 const pine1 = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 100);
@@ -108,7 +108,7 @@ The FMP provider fetches stock, forex, and crypto data from [Financial Modeling 
 ### Quick Start
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 // Configure with your API key
 Provider.FMP.configure({ apiKey: 'your-api-key' });
@@ -133,7 +133,7 @@ hline(30, "Oversold")
 Provider.FMP.configure({ apiKey: 'your-api-key' });
 
 // Option 2: Direct instantiation with config
-import { FMPProvider } from 'pinets';
+import { FMPProvider } from '@nfwyst/pinets';
 const fmp = new FMPProvider({ apiKey: 'your-api-key' });
 const pine = new PineTS(fmp, 'AAPL', 'D', 200);
 ```
@@ -167,7 +167,7 @@ const pine = new PineTS(fmp, 'AAPL', 'D', 200);
 ### Examples
 
 ```typescript
-import { PineTS, Provider, FMPProvider } from 'pinets';
+import { PineTS, Provider, FMPProvider } from '@nfwyst/pinets';
 
 // Configure singleton
 Provider.FMP.configure({ apiKey: 'your-api-key' });
@@ -195,7 +195,7 @@ The Alpaca provider fetches US stock and crypto data from [Alpaca Markets](https
 ### Quick Start
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 // Configure with your credentials
 Provider.Alpaca.configure({
@@ -230,7 +230,7 @@ Provider.Alpaca.configure({
 });
 
 // Option 2: Direct instantiation
-import { AlpacaProvider } from 'pinets';
+import { AlpacaProvider } from '@nfwyst/pinets';
 const alpaca = new AlpacaProvider({
     apiKey: 'PK...',
     apiSecret: '...',
@@ -281,7 +281,7 @@ Alpaca natively supports all common timeframes including `'45'` and `'180'` whic
 ### Examples
 
 ```typescript
-import { PineTS, Provider, AlpacaProvider } from 'pinets';
+import { PineTS, Provider, AlpacaProvider } from '@nfwyst/pinets';
 
 // Configure singleton
 Provider.Alpaca.configure({
@@ -313,7 +313,7 @@ const pine3 = new PineTS(alpaca, 'MSFT', '60', 500);
 You can bypass providers entirely by passing your own OHLCV data array:
 
 ```typescript
-import { PineTS } from 'pinets';
+import { PineTS } from '@nfwyst/pinets';
 
 const customData = [
     {
@@ -368,8 +368,8 @@ If `openTime` / `closeTime` are omitted, time-dependent functions (`time`, `hour
 You can create your own provider by implementing the `IProvider` interface or extending `BaseProvider`:
 
 ```typescript
-import { BaseProvider, PineTS } from 'pinets';
-import type { ISymbolInfo, Kline } from 'pinets';
+import { BaseProvider, PineTS } from '@nfwyst/pinets';
+import type { ISymbolInfo, Kline } from '@nfwyst/pinets';
 
 class MyProvider extends BaseProvider {
     constructor() {
@@ -412,7 +412,7 @@ By extending `BaseProvider`, you get automatic timeframe aggregation for free. I
 You can also add your provider to the global registry for convenience:
 
 ```typescript
-import { Provider } from 'pinets';
+import { Provider } from '@nfwyst/pinets';
 
 Provider['MyProvider'] = new MyProvider();
 // Now available as Provider.MyProvider
@@ -431,7 +431,7 @@ A ticker may carry a chart-type modifier suffix — `"BTCUSDT;heikinashi"` (see 
 Pine's `request.footprint()` needs order-flow data that plain candles do not carry. A provider opts in by implementing the optional `IFootprintProvider` surface next to `IProvider` — the same `(tickerId, timeframe, limit, sDate, eDate)` vocabulary as `getMarketData`, returning one `FootprintBar` per bar it can serve:
 
 ```typescript
-import type { FootprintBar } from 'pinets';
+import type { FootprintBar } from '@nfwyst/pinets';
 
 class MyProvider extends BaseProvider {
     // ...getMarketData / getSymbolInfo as above...

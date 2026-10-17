@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { Kline } from './types';
-import { ParsedTimeframe, parseTimeframe, timeframeBarEnd, timeframeBarStart, timeframeSeconds } from '../timeframe';
+import { ParsedTimeframe, parseTimeframe, timeframeBarRange, timeframeSeconds } from '../timeframe';
+import { createSessionGrid } from '../namespaces/sessionSpec';
+import type { SessionGrid } from '../namespaces/sessionSpec';
 
 export interface AggregationOptions {
     /**
@@ -11,6 +13,10 @@ export interface AggregationOptions {
      * open time and last sub-candle's close time.
      */
     calendarGrid?: boolean;
+    /** Pine session string used to anchor target bars to the exchange trading day. */
+    session?: string;
+    /** IANA exchange timezone for {@link session}. */
+    timezone?: string;
 }
 
 const isCalendarUnit = (tf: ParsedTimeframe) => tf.unit === 'D' || tf.unit === 'W' || tf.unit === 'M';
@@ -101,9 +107,10 @@ export function aggregateCandles(
     if (subCandles.length === 0) return [];
     const target = parseTimeframe(targetTimeframe);
     if (!target) return [];
+    const sessionGrid = createSessionGrid(options.session, options.timezone);
 
-    if (options.calendarGrid || isGridOnly(target)) {
-        return _aggregateByGrid(subCandles, target, !!options.calendarGrid);
+    if (sessionGrid || options.calendarGrid || isGridOnly(target)) {
+        return _aggregateByGrid(subCandles, target, !!options.calendarGrid || sessionGrid !== null, sessionGrid);
     }
 
     // Fixed-ratio aggregation with session-boundary detection
@@ -114,27 +121,32 @@ export function aggregateCandles(
 // ── Internal helpers ────────────────────────────────────────────────────
 
 /** Group candles by the bar of `target` their open time falls in. */
-function _aggregateByGrid(candles: Kline[], target: ParsedTimeframe, stampGrid: boolean): Kline[] {
+function _aggregateByGrid(candles: Kline[], target: ParsedTimeframe, stampGrid: boolean, sessionGrid: SessionGrid | null = null): Kline[] {
     const result: Kline[] = [];
     let group: Kline[] = [];
     let groupStart = NaN;
+    let groupEnd = NaN;
 
     const flush = () => {
+        if (group.length === 0) return;
         const bar = _mergeGroup(group);
         if (stampGrid) {
             bar.openTime = groupStart;
-            bar.closeTime = timeframeBarEnd(groupStart, target);
+            bar.closeTime = groupEnd;
         }
         result.push(bar);
     };
 
     for (const candle of candles) {
-        const start = timeframeBarStart(candle.openTime, target);
+        const range = timeframeBarRange(candle.openTime, target, sessionGrid);
+        if (!range) continue;
+        const start = range.start;
         if (group.length > 0 && start !== groupStart) {
             flush();
             group = [];
         }
         groupStart = start;
+        groupEnd = range.end;
         group.push(candle);
     }
     if (group.length > 0) flush();

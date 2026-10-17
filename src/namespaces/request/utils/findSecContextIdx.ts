@@ -1,31 +1,31 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+function lastLessThanOrEqual(values: readonly number[], target: number): number {
+    let low = 0;
+    let high = values.length - 1;
+    let result = -1;
+
+    while (low <= high) {
+        const middle = low + Math.floor((high - low) / 2);
+        if (values[middle] <= target) {
+            result = middle;
+            low = middle + 1;
+        } else {
+            high = middle - 1;
+        }
+    }
+
+    return result;
+}
+
 export function findSecContextIdx(
     myOpenTime: number,
     myCloseTime: number,
-    openTime: number[],
-    closeTime: number[],
+    openTime: readonly number[],
+    closeTime: readonly number[],
     lookahead: boolean = false,
     isRealtime: boolean = false
 ): number {
-    for (let i = 0; i < openTime.length; i++) {
-        // Match based on where the LTF bar opens, not requiring full containment.
-        // This handles bars that straddle HTF boundaries (e.g. a weekly bar that
-        // opens in July but closes in August).
-        if (openTime[i] <= myOpenTime && myOpenTime < closeTime[i]) {
-            if (lookahead) {
-                return i;
-            }
-            // For lookahead=false (default):
-            // If the HTF bar is closed (myCloseTime >= closeTime[i]), we can use its value (i).
-            // If the HTF bar is still open, we must use the previous bar (i-1) to avoid future leak.
-            // Exception: on the realtime (last) bar, TradingView returns the current developing
-            // HTF values (i) — lookahead_off only prevents future leak on historical bars.
-            if (isRealtime) {
-                return i;
-            }
-            return myCloseTime >= closeTime[i] ? i : i - 1;
-        }
-    }
-    return -1;
+    if (lookahead || isRealtime) return lastLessThanOrEqual(openTime, myOpenTime);
+    return lastLessThanOrEqual(closeTime, myCloseTime);
 }

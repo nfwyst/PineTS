@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { Series } from '../../../Series';
+import { roundForComparison } from '../comparison';
 
 /**
  * Pine Script na-aware inequality comparison.
@@ -27,8 +28,7 @@ export function __neq(context: any) {
             // Pine Script: any comparison with `na` evaluates to `na`.
             if (isNaN(valA) || isNaN(valB)) return NaN;
 
-            // TradingView treats values equal within an absolute 1e-10 tolerance.
-            return Math.abs(valA - valB) >= 1e-10;
+            return roundForComparison(valA) !== roundForComparison(valB);
         }
 
         return valA !== valB;

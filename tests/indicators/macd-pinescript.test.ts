@@ -5,7 +5,7 @@ import { Provider } from '@pinets/marketData/Provider.class';
 
 describe('Indicators', () => {
     it('MACD from Pine Script source', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '1d', 100, 0, new Date('Dec 25 2024').getTime() - 1);        
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDT', '1d', 100, 0, new Date('Dec 25 2024').getTime() - 1);
 
         const code = `
 //@version=6
@@ -44,7 +44,7 @@ plot(signal, "Signal line", #ff6d00)
 
 
     it('MACD from Pine Script source with switch/case statements', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '1d', 100, 0, new Date('Dec 25 2024').getTime() - 1);        
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDT', '1d', 100, 0, new Date('Dec 25 2024').getTime() - 1);
 
         const code = `
 //@version=6

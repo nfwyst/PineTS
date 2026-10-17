@@ -2,6 +2,7 @@
 // Copyright (C) 2026 LuxAlgo
 
 import { resolveColorToRgba, rgbaToHex8 } from '../../../namespaces/color/PineColor';
+import { roundForComparison } from '../../../namespaces/math/comparison';
 import * as PINE_CONSTANTS from '../../../namespaces/Types';
 import { SOURCE_BUILTINS } from '../../../namespaces/input/utils';
 
@@ -168,9 +169,10 @@ function evalBinary(node: any, env: ConstEnv): ConstValue | undefined {
     }
 
     if (op === '==' || op === '===' || op === '!=' || op === '!==') {
-        const comparable = (isNumeric(left) && isNumeric(right)) || (left.type === right.type && ['string', 'bool'].includes(left.type));
+        const numeric = isNumeric(left) && isNumeric(right);
+        const comparable = numeric || (left.type === right.type && ['string', 'bool'].includes(left.type));
         if (!comparable) return undefined;
-        const eq = isNumeric(left) ? Math.abs((left.value as number) - (right.value as number)) < 1e-10 : left.value === right.value;
+        const eq = numeric ? roundForComparison(left.value) === roundForComparison(right.value) : left.value === right.value;
         return { value: op.startsWith('=') ? eq : !eq, type: 'bool', exact: allExact(left, right) };
     }
 
@@ -195,13 +197,13 @@ function evalBinary(node: any, env: ConstEnv): ConstValue | undefined {
             if (b === 0) return undefined;
             return num(a % b, numType(left, right), exact);
         case '>':
-            return { value: a > b, type: 'bool', exact };
+            return { value: roundForComparison(a) > roundForComparison(b), type: 'bool', exact };
         case '<':
-            return { value: a < b, type: 'bool', exact };
+            return { value: roundForComparison(a) < roundForComparison(b), type: 'bool', exact };
         case '>=':
-            return { value: a >= b, type: 'bool', exact };
+            return { value: roundForComparison(a) >= roundForComparison(b), type: 'bool', exact };
         case '<=':
-            return { value: a <= b, type: 'bool', exact };
+            return { value: roundForComparison(a) <= roundForComparison(b), type: 'bool', exact };
         default:
             return undefined;
     }

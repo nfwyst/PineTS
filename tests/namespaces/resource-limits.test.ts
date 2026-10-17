@@ -8,6 +8,10 @@ import { describe, it, expect } from 'vitest';
 import { PineTS } from '../../src/PineTS.class';
 import { Provider } from '@pinets/marketData/Provider.class';
 import { PineRuntimeError } from '../../src/errors/PineRuntimeError';
+import { Context } from '../../src/Context.class';
+import { PineArrayObject, PineArrayType } from '../../src/namespaces/array/PineArrayObject';
+import { PineMatrixObject } from '../../src/namespaces/matrix/PineMatrixObject';
+import { MAX_COLLECTION_ELEMENTS } from '../../src/namespaces/limits';
 
 function newPineTS(sStr = '2024-01-01', eStr = '2024-01-02') {
     return new PineTS(Provider.Mock, 'BTCUSDC', '60', null, new Date(sStr).getTime(), new Date(eStr).getTime());
@@ -45,6 +49,55 @@ describe('F2 — collection built-ins cap allocation at the element limit', () =
         const { plots } = await newPineTS().run(H + `a = array.new_float(100, 0.0)\nplot(array.size(a))`);
         expect((Object.values(plots)[0] as any).data.at(-1).value).toBe(100);
     });
+});
+
+describe('F2 — collection mutations cannot grow past the element limit', () => {
+    function newContext(): Context {
+        return new Context({ marketData: [], source: [] });
+    }
+
+    function sparseArray(context: Context, length: number): PineArrayObject {
+        return new PineArrayObject(new Array(length), PineArrayType.float, context);
+    }
+
+    const growthCases: Array<[string, () => void]> = [
+        ['array.push', () => {
+            const context = newContext();
+            context.pine.array.push(sparseArray(context, MAX_COLLECTION_ELEMENTS), 1);
+        }],
+        ['array.unshift', () => {
+            const context = newContext();
+            context.pine.array.unshift(sparseArray(context, MAX_COLLECTION_ELEMENTS), 1);
+        }],
+        ['array.insert', () => {
+            const context = newContext();
+            context.pine.array.insert(sparseArray(context, MAX_COLLECTION_ELEMENTS), 0, 1);
+        }],
+        ['array.concat', () => {
+            const context = newContext();
+            const left = sparseArray(context, 60_000);
+            const right = sparseArray(context, 40_001);
+            context.pine.array.concat(left, right);
+        }],
+        ['array slice growth', () => {
+            const context = newContext();
+            const source = sparseArray(context, MAX_COLLECTION_ELEMENTS);
+            const slice = context.pine.array.slice(source, 0, MAX_COLLECTION_ELEMENTS);
+            context.pine.array.push(slice, 1);
+        }],
+        ['matrix.add_row', () => {
+            const context = newContext();
+            const matrix = new PineMatrixObject(0, 0, NaN, context);
+            matrix.matrix = Array.from({ length: 1_000 }, () => new Array(100));
+            context.pine.matrix.add_row(matrix);
+        }],
+    ];
+
+    for (const [name, grow] of growthCases) {
+        it(`${name} over the limit raises a PineRuntimeError`, () => {
+            expect(grow).toThrow(PineRuntimeError);
+        });
+    }
 });
 
 describe('F3 — request.security fan-out is bounded per run', () => {

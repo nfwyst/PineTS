@@ -11,7 +11,16 @@ export function change(context: any) {
             _callId = _length;
             _length = 1;
         }
-        const length = Series.from(_length).get(0);
+        const length = Math.trunc(Series.from(_length).get(0));
+        if (Number.isNaN(length)) {
+            throw new RangeError("Invalid value of the 'length' argument in the 'change' function. It must not be na");
+        }
+        if (!Number.isFinite(length)) {
+            throw new RangeError(`Invalid value of the 'length' argument (${length}) in the 'change' function. It must be finite.`);
+        }
+        if (length <= 0) {
+            throw new RangeError(`Invalid value of the 'length' argument (${length}) in the 'change' function. It must be > 0.`);
+        }
 
         // Simple lookback - store window
         if (!context.taState) context.taState = {};

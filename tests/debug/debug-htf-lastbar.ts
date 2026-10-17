@@ -1,7 +1,7 @@
 /**
  * Debug script: Verify HTF last-bar fix on 1h timeframe.
  *
- * Usage: cd PineTS && npx tsx --tsconfig tsconfig.json tests/debug/debug-htf-lastbar.ts
+ * Usage: cd PineTS && bun run --tsconfig tsconfig.json tests/debug/debug-htf-lastbar.ts
  */
 
 import { PineTS } from '../../src/PineTS.class';

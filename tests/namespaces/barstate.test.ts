@@ -7,8 +7,8 @@
  * Tests for barstate properties: isfirst, islast, ishistory, isrealtime,
  * isconfirmed, islastconfirmedhistory.
  *
- * Uses Binance live data for accurate closeTime values, which are essential
- * for isconfirmed, islastconfirmedhistory, ishistory, and isrealtime.
+ * Uses deterministic Mock data plus fixed-clock array fixtures so close-time
+ * behavior is offline, repeatable, and independent of the current wall clock.
  *
  * Includes regression tests for:
  * - isconfirmed: Was checking last bar's closeTime instead of current bar's.
@@ -17,17 +17,23 @@
  * - islastconfirmedhistory: Same Series data access fix.
  */
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { Context } from '../../src/Context.class';
 import PineTS from '../../src/PineTS.class';
 import { Provider } from '../../src/marketData/Provider.class';
 
 describe('Barstate Namespace', () => {
-    // Use Binance weekly data with a well-defined historical range
+    // Use deterministic weekly data with a well-defined historical range.
     const sDate = new Date('2020-01-01').getTime();
     const eDate = new Date('2020-06-01').getTime();
 
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
     it('should report isfirst correctly', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate, eDate);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate, eDate);
 
         const sourceCode = (context: any) => {
             const { barstate } = context.pine;
@@ -46,7 +52,7 @@ describe('Barstate Namespace', () => {
     });
 
     it('should report islast correctly', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate, eDate);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate, eDate);
 
         const sourceCode = (context: any) => {
             const { barstate } = context.pine;
@@ -66,7 +72,7 @@ describe('Barstate Namespace', () => {
     });
 
     it('should report ishistory and isrealtime as booleans for each bar', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate, eDate);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate, eDate);
 
         const sourceCode = (context: any) => {
             const { barstate } = context.pine;
@@ -90,7 +96,7 @@ describe('Barstate Namespace', () => {
         // Regression test: barstate.isconfirmed used to access closeTime[idx]
         // on a Series object (always undefined → false). Fixed to use closeTime.data[idx].
         // All bars from 2020 are historical — their closeTime is in the past.
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate, eDate);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate, eDate);
 
         const sourceCode = (context: any) => {
             const { barstate } = context.pine;
@@ -111,7 +117,7 @@ describe('Barstate Namespace', () => {
         // Before the fix, barstate.isconfirmed was always false for historical data
         // because it used Series bracket access instead of .data[] access.
         // This caused confirmedCount to be 0 in the pressure-zone-analyzer script.
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate, eDate);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate, eDate);
 
         const sourceCode = (context: any) => {
             const { barstate } = context.pine;
@@ -136,7 +142,7 @@ describe('Barstate Namespace', () => {
     it('should report islastconfirmedhistory as boolean without crashing (regression: Series data access)', async () => {
         // Regression test: islastconfirmedhistory used to crash when accessing
         // closeTime[idx] on a Series object. Fixed to use closeTime.data[idx].
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate, eDate);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate, eDate);
 
         const sourceCode = (context: any) => {
             const { barstate } = context.pine;
@@ -153,8 +159,29 @@ describe('Barstate Namespace', () => {
         }
     });
 
+    it('does not normalize close times for ordinary historical bars', async () => {
+        // Given: a closed six-bar dataset and an observable normalized-close-time boundary.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2024-01-08T00:00:00Z'));
+        const dayMs = 86_400_000;
+        const bars = Array.from({ length: 6 }, (_, index) => {
+            const openTime = Date.UTC(2024, 0, 1) + index * dayMs;
+            return { openTime, closeTime: openTime + dayMs, open: 1, high: 1, low: 1, close: 1, volume: 1 };
+        });
+        const normalizedCloseTime = vi.spyOn(Context.prototype, 'normalizedCloseTime', 'get');
+
+        // When: Pine evaluates last-confirmed-history on every bar.
+        const { result } = await new PineTS(bars, 'TEST', 'D').run(($) => ({
+            isLch: $.pine.barstate.islastconfirmedhistory,
+        }));
+
+        // Then: only the final and penultimate decision branches may normalize the dataset.
+        expect(result.isLch).toEqual([false, false, false, false, false, true]);
+        expect(normalizedCloseTime).toHaveBeenCalledTimes(2);
+    });
+
     it('should use barstate.isconfirmed in conditional logic (Pine Script)', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'W', null, sDate, eDate);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, sDate, eDate);
 
         const code = `
 //@version=5
@@ -175,5 +202,78 @@ plot(confirmedBars, "Confirmed")
         const lastValue = plots['Confirmed'].data[plots['Confirmed'].data.length - 1].value;
         expect(lastValue).toBeGreaterThan(0);
         expect(lastValue).toBe(plots['Confirmed'].data.length);
+    });
+
+    it('missing closeTime with a forming last bar identifies only the penultimate history bar', async () => {
+        // Given: three daily bars without raw closeTime, with the last bar still forming.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2024-01-03T12:00:00Z'));
+        const dayMs = 86_400_000;
+        const bars = [0, 1, 2].map((offset) => ({
+            openTime: Date.UTC(2024, 0, 1) + offset * dayMs,
+            open: 1,
+            high: 1,
+            low: 1,
+            close: 1,
+            volume: 1,
+        }));
+
+        // When: barstate is evaluated against the complete normalized close-time view.
+        const { result } = await new PineTS(bars, 'TEST', 'D').run(($) => ({
+            isLch: $.pine.barstate.islastconfirmedhistory,
+        }));
+
+        // Then: the bar immediately before the forming bar is the sole match.
+        expect(result.isLch).toEqual([false, true, false]);
+    });
+
+    it('missing closeTime with a closed dataset identifies only the final bar', async () => {
+        // Given: the same missing-closeTime daily bars after their final derived close.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2024-01-04T12:00:00Z'));
+        const dayMs = 86_400_000;
+        const bars = [0, 1, 2].map((offset) => ({
+            openTime: Date.UTC(2024, 0, 1) + offset * dayMs,
+            open: 1,
+            high: 1,
+            low: 1,
+            close: 1,
+            volume: 1,
+        }));
+
+        // When: barstate is evaluated after every normalized close time.
+        const { result } = await new PineTS(bars, 'TEST', 'D').run(($) => ({
+            isLch: $.pine.barstate.islastconfirmedhistory,
+        }));
+
+        // Then: the final closed bar is the sole match.
+        expect(result.isLch).toEqual([false, false, true]);
+    });
+
+    it('explicit closeTime forming data still identifies only the penultimate bar', async () => {
+        // Given: equivalent daily bars with provider-supplied close times.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2024-01-03T12:00:00Z'));
+        const dayMs = 86_400_000;
+        const bars = [0, 1, 2].map((offset) => {
+            const openTime = Date.UTC(2024, 0, 1) + offset * dayMs;
+            return {
+                openTime,
+                closeTime: openTime + dayMs,
+                open: 1,
+                high: 1,
+                low: 1,
+                close: 1,
+                volume: 1,
+            };
+        });
+
+        // When: barstate consumes the normalized view that preserves explicit values.
+        const { result } = await new PineTS(bars, 'TEST', 'D').run(($) => ({
+            isLch: $.pine.barstate.islastconfirmedhistory,
+        }));
+
+        // Then: existing explicit-close behavior is unchanged.
+        expect(result.isLch).toEqual([false, true, false]);
     });
 });

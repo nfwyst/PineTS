@@ -213,9 +213,9 @@ export function yourFunction(context: any) {
 #### Step 2: Regenerate Barrel File
 
 ```bash
-npm run generate:ta-index
+bun run generate:ta-index
 # or
-npm run generate:math-index
+bun run generate:math-index
 # etc.
 ```
 

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { sessionTimeframeBar } from './namespaces/sessionSpec';
+import type { SessionBar, SessionGrid } from './namespaces/sessionSpec';
+
 /**
  * Timeframe strings — the single parser behind `request.security*`, `timeframe.*`,
  * `time()` and the market-data providers.
@@ -188,4 +191,39 @@ export function timeframeBarEnd(barStart: number, tf: ParsedTimeframe): number {
         case 'M':
             return Math.min(Date.UTC(year, d.getUTCMonth() + n, 1), Date.UTC(year + 1, 0, 1));
     }
+}
+
+/** Resolve the complete bar range on either an exchange-session grid or the legacy UTC grid. */
+export function timeframeBarRange(timestamp: number, tf: ParsedTimeframe, sessionGrid: SessionGrid | null = null): SessionBar | null {
+    if (sessionGrid) return sessionTimeframeBar(timestamp, tf, sessionGrid);
+    const start = timeframeBarStart(timestamp, tf);
+    return {
+        start,
+        end: timeframeBarEnd(start, tf),
+        tradingDay: Math.floor(start / DAY_MS) * DAY_MS,
+    };
+}
+
+/** Shift a resolved bar by `offset` periods; positive values move into the future. */
+export function shiftTimeframeBar(timestamp: number, tf: ParsedTimeframe, offset: number, sessionGrid: SessionGrid | null = null): SessionBar | null {
+    let bar = timeframeBarRange(timestamp, tf, sessionGrid);
+    if (!bar || offset === 0) return bar;
+    const direction = Math.sign(offset);
+
+    for (let moved = 0; moved < Math.abs(offset); moved++) {
+        let probe = direction > 0 ? bar.end : bar.start - 1;
+        let next = timeframeBarRange(probe, tf, sessionGrid);
+        if (sessionGrid) {
+            const scanLimit = 8 * 24 * 60;
+            let scans = 0;
+            while ((!next || next.start === bar.start) && scans < scanLimit) {
+                probe += direction * 60_000;
+                next = timeframeBarRange(probe, tf, sessionGrid);
+                scans++;
+            }
+        }
+        if (!next || next.start === bar.start) return null;
+        bar = next;
+    }
+    return bar;
 }

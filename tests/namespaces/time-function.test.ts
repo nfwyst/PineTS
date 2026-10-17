@@ -1,6 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import { PineTS, Provider } from 'index';
 
+it('reads supplied chart timestamps when an array source has no timeframe metadata', async () => {
+    const start = Date.UTC(2024, 0, 1);
+    const bars = [0, 2].map((hour) => ({
+        openTime: start + hour * 3_600_000,
+        closeTime: start + (hour + 1) * 3_600_000,
+        open: 2, high: 3, low: 1, close: 2, volume: 1,
+    }));
+
+    const context = await new PineTS(bars).run(`//@version=6
+indicator("array chart times")
+plot(time(""), "open")
+plot(time_close(""), "close")
+plot(time("", bars_back = 1), "previous")
+plot(time("", "0000-0100", "UTC"), "session")`);
+
+    expect(context.plots.open.data.map((point) => point.value)).toEqual(bars.map((bar) => bar.openTime));
+    expect(context.plots.close.data.map((point) => point.value)).toEqual(bars.map((bar) => bar.closeTime));
+    expect(context.plots.previous.data.map((point) => point.value)).toEqual([NaN, start]);
+    expect(context.plots.session.data.map((point) => point.value)).toEqual([start, NaN]);
+});
+
 // Mock provider has daily data. Use daily chart with higher TF alignment tests.
 // For intraday tests, use Binance provider.
 
@@ -129,7 +150,7 @@ plot(t_w, "weekly")
         const { plots } = await pineTS.run(code);
 
         const weeklyData = plots['weekly'].data.filter((d: any) => d.value != null && !isNaN(d.value));
-        const uniqueWeeks = [...new Set(weeklyData.map((d: any) => d.value))].sort((a: number, b: number) => a - b);
+        const uniqueWeeks = [...new Set<number>(weeklyData.map((d: any) => d.value))].sort((a: number, b: number) => a - b);
 
         // Each unique week should be 7 days apart
         for (let i = 1; i < uniqueWeeks.length; i++) {
@@ -140,7 +161,7 @@ plot(t_w, "weekly")
 
 describe('time() function — intraday alignment (Binance)', () => {
     // Use Binance 15min data for intraday timeframe tests
-    const makePineTS = () => new PineTS(Provider.Binance, 'BTCUSDC', '15', 200);
+    const makePineTS = () => new PineTS(Provider.Mock, 'BTCUSDC', '15', 200);
 
     it('time("D") returns daily-aligned timestamps on 15min chart', async () => {
         const code = `

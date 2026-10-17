@@ -1,6 +1,6 @@
 import { Series } from '../Series';
 import { PineRuntimeError } from '../errors/PineRuntimeError';
-import { ParsedTimeframe, formatTimeframe, parseTimeframe, timeframeBarStart, timeframeFromSeconds, timeframeSeconds } from '../timeframe';
+import { ParsedTimeframe, formatTimeframe, parseTimeframe, timeframeBarRange, timeframeFromSeconds, timeframeSeconds } from '../timeframe';
 
 const unwrap = (v: any) => (typeof v === 'function' ? v() : v instanceof Series ? v.get(0) : v);
 
@@ -90,7 +90,9 @@ export class Timeframe {
 
         if (isNaN(currentTime) || isNaN(prevTime)) return false;
 
-        return timeframeBarStart(currentTime, tf) !== timeframeBarStart(prevTime, tf);
+        const currentBar = timeframeBarRange(currentTime, tf, this.context.sessionGrid);
+        const previousBar = timeframeBarRange(prevTime, tf, this.context.sessionGrid);
+        return currentBar !== null && previousBar !== null && currentBar.start !== previousBar.start;
     }
 
     public from_seconds(seconds: any) {

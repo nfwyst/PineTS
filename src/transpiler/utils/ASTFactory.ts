@@ -152,7 +152,7 @@ export const ASTFactory = {
 
     // Create $.pine.math.<method>(left, right) — na-aware comparison helpers
     // (__eq/__neq/__lt/__le/__gt/__ge). Routes relational/equality operators
-    // through the runtime so `na` propagates and the 1e-10 tolerance applies.
+    // through the runtime so `na` propagates and float operands round to nine fractional digits.
     createMathCompareCall(method: string, left: any, right: any): any {
         const pineObj = this.createMemberExpression(this.createContextIdentifier(), this.createIdentifier('pine'), false);
         const mathObj = this.createMemberExpression(pineObj, this.createIdentifier('math'), false);

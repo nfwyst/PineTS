@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { ISymbolInfo, ApiKeyProviderConfig } from '@pinets/marketData/IProvider';
-import { BaseProvider } from '@pinets/marketData/BaseProvider';
+import { ISymbolInfo, ApiKeyProviderConfig } from '../IProvider';
+import { BaseProvider } from '../BaseProvider';
 import { stripTickerModifier } from '../../tickerModifier';
-import { Kline, PeriodType, computeNextPeriodStart, localTimeToUTC } from '@pinets/marketData/types';
+import { Kline, PeriodType, computeNextPeriodStart, localTimeToUTC } from '../types';
+import { fetchWithTimeout } from '../fetchWithTimeout';
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -254,8 +255,7 @@ export class AlpacaProvider extends BaseProvider<AlpacaProviderConfig> {
 
             return this._convertBarsStock(allBars, periodType, multiplier);
         } catch (error) {
-            console.error('Error in AlpacaProvider.getMarketData:', error);
-            return [];
+            throw error;
         }
     }
 
@@ -278,7 +278,7 @@ export class AlpacaProvider extends BaseProvider<AlpacaProviderConfig> {
 
         do {
             const url = this._buildBarsUrl(tickerId, alpacaTf, isCrypto, sDate, eDate, pageLimit, pageToken);
-            const response = await fetch(url, { headers: this._headers() });
+            const response = await fetchWithTimeout(url, { headers: this._headers() });
 
             if (!response.ok) {
                 const text = await response.text();
@@ -575,7 +575,7 @@ export class AlpacaProvider extends BaseProvider<AlpacaProviderConfig> {
         }
 
         const url = `${this._tradingUrl}/calendar?start=${startDate}&end=${endDate}`;
-        const response = await fetch(url, { headers: this._headers() });
+        const response = await fetchWithTimeout(url, { headers: this._headers() });
         if (!response.ok) {
             console.warn(`Alpaca calendar API returned ${response.status}, falling back to defaults`);
             return;
@@ -596,7 +596,7 @@ export class AlpacaProvider extends BaseProvider<AlpacaProviderConfig> {
 
         const encodedSymbol = encodeURIComponent(tickerId);
         const url = `${this._tradingUrl}/assets/${encodedSymbol}`;
-        const response = await fetch(url, { headers: this._headers() });
+        const response = await fetchWithTimeout(url, { headers: this._headers() });
         if (!response.ok) return null;
 
         const asset: AlpacaAsset = await response.json();

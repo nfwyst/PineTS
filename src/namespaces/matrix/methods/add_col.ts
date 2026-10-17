@@ -5,6 +5,7 @@ import { Context } from '../../../Context.class';
 
 import { Series } from '../../../Series';
 import { PineArrayObject } from '../../array/PineArrayObject';
+import { assertCollectionGrowth } from '../../limits';
 
 export function add_col(context: Context) {
     return (id: PineMatrixObject, column_index?: number, values?: any) => {
@@ -22,6 +23,7 @@ export function add_col(context: Context) {
         }
 
         if (rows === 0) {
+            assertCollectionGrowth(0, colValues.length, 'matrix.add_col');
             // Create rows based on colValues length
             for (let i = 0; i < colValues.length; i++) {
                 let val = colValues[i];
@@ -33,6 +35,7 @@ export function add_col(context: Context) {
 
         const cols = id.matrix[0].length;
         const index = column_index !== undefined ? column_index : cols;
+        assertCollectionGrowth(rows * cols, rows, 'matrix.add_col');
 
         for (let i = 0; i < rows; i++) {
             let val = i < colValues.length ? colValues[i] : NaN;

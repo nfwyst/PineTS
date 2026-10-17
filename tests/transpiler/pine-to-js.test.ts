@@ -8,6 +8,7 @@ describe('Transpiler Scope Edge Cases', () => {
     it('should convert MACD PineScript to JavaScript', () => {
         const code = `
 //@version=5
+indicator("MACD")
 // Getting inputs
 fast_length = input(title = "Fast Length", defval = 12)
 slow_length = input(title = "Slow Length", defval = 26)

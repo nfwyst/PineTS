@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { PineTS } from '../../../PineTS.class';
+import type { Context } from '../../../Context.class';
 import { Series } from '../../../Series';
+import { clonePineGraph } from '../../../core/clonePineGraph';
 import { plainTickerId, splitTickerModifier, withTickerModifier } from '../../../tickerModifier';
 import { formatTimeframe, parseTimeframe, timeframeSeconds } from '../../../timeframe';
 import { findSecContextIdx } from '../utils/findSecContextIdx';
 import { findLTFContextIdx } from '../utils/findLTFContextIdx';
-import { parseArgsForPineParams } from '../../utils';
+import { isNamedArgsBag, parseArgsForPineParams } from '../../utils';
 import { trackRequestContext, MAX_CALC_BARS } from '../../limits';
+import { runSecondary } from '../utils/runSecondary';
+
+const DEFAULT_HTF_WARMUP_BARS = 250;
 
 // Pine signature (v5/v6):
 //   request.security(symbol, timeframe, expression, gaps, lookahead, ignore_invalid_symbol, currency, calc_bars_count)
@@ -45,16 +49,20 @@ function isParamTuple(v: any): v is [any, string] {
 
 /**
  * Unwrap a request.param `[value, name]` tuple into just the value, and capture
- * its name into `outNames` at the same index. Other arg shapes pass through.
+ * its name into `outNames` at the same index. The trailing named-arguments bag
+ * also arrives as `[bag, name]` (the transpiler wraps every argument), but its
+ * [1] is the bag wrapper's own name, not an expression the secondary records;
+ * leave the bag itself a plain object so its slot can never be mistaken for a
+ * real Pine tuple expression (e.g. `[close > open, syminfo.ticker]`).
  */
 function unwrapParamTuples(rawArgs: any[], outNames: (string | undefined)[]): any[] {
     return rawArgs.map((a) => {
-        if (isParamTuple(a)) {
+        if (isParamTuple(a) && !isNamedArgsBag(a[0])) {
             outNames.push(a[1]);
             return a[0];
         }
         outNames.push(undefined);
-        return a;
+        return isParamTuple(a) ? a[0] : a;
     });
 }
 
@@ -68,9 +76,12 @@ function resolveSlotValue(v: any): any {
 }
 
 /**
- * Resolve the request.param name attached to a slot. Checks two sources:
- *  1. The positional argName captured at parse time (slot filled positionally).
- *  2. The wrapper tuple inside the options bag (slot filled via named args).
+ * Resolve the request.param name attached to the expression slot:
+ *  - Positionally passed expressions are plain `[value, pN]` wrappers, so the
+ *    positional argName (captured during unwrapping) is the secondary's name.
+ *  - A named `expression = x` slot lives inside the named-arguments bag; the
+ *    transpiler wraps x itself with request.param, so the parsed slot is
+ *    `[value, innerParamName]` and that inner name is the one to read.
  */
 function resolveSlotName(
     slotName: string,
@@ -104,6 +115,11 @@ function resolveExprValue(v: any): any {
     // Tuple array — resolve each element
     if (Array.isArray(v)) return v.map(resolveExprValue);
     return v;
+}
+
+function copyRequestedValue(value: unknown): unknown {
+    const copy = clonePineGraph(value);
+    return Array.isArray(copy) ? [copy] : copy;
 }
 
 export function security(context: any) {
@@ -172,7 +188,7 @@ export function security(context: any) {
         // just return the expression value directly without creating another context
         if (context.isSecondaryContext) {
             const resolved = resolveExprValue(_expression);
-            return Array.isArray(resolved) ? [resolved] : resolved;
+            return copyRequestedValue(resolved);
         }
 
         const ctxTimeframe = parseTimeframe(context.timeframe);
@@ -200,11 +216,17 @@ export function security(context: any) {
 
         // Same length is not enough: "7D" bars follow the yearly day grid, "W" bars start on Mondays.
         const isSameTimeframe = formatTimeframe(ctxTimeframe) === formatTimeframe(reqTimeframe);
+        if (Array.isArray(context.source) && !(isSameSymbol && isSameTimeframe)) {
+            throw new Error(
+                `request.security needs a market data provider to load ${_symbol || context.tickerId || 'the chart symbol'} "${_timeframe}": ` +
+                `an array data source only holds the chart's own symbol and timeframe`,
+            );
+        }
         if (isSameTimeframe && isSameSymbol) {
             // Resolve any helper objects (TimeComponentHelper, NAHelper, Series, etc.)
             // in the expression that haven't been extracted to their primitive values yet.
             const resolved = resolveExprValue(_expression);
-            return Array.isArray(resolved) ? [resolved] : resolved;
+            return copyRequestedValue(resolved);
         }
 
         const isLTF = ctxSeconds > reqSeconds;
@@ -226,8 +248,7 @@ export function security(context: any) {
 
         if (context.cache[cacheKey]) {
             const cached = context.cache[cacheKey];
-            // The requested series failed to load and the call ignores invalid
-            // symbols: na on every bar (warned once, when it failed).
+            // A failed ignored request stays na on later bars without retrying.
             if (cached.failed) return NaN;
 
             // Refresh secondary context when main context's data has changed (streaming mode)
@@ -253,7 +274,9 @@ export function security(context: any) {
                 return NaN;
             }
 
-            const value = secContext.params[_expression_name][secContextIdx];
+            const values = secContext.params[_expression_name];
+            if (values === undefined) return NaN;
+            const value = values[secContextIdx];
 
             // Handle gaps for HTF (Higher Timeframe)
             if (!isLTF && _gaps) {
@@ -271,31 +294,30 @@ export function security(context: any) {
 
                 // Index changed (or first call) - update and return value
                 context.cache[gapCacheKey] = secContextIdx;
-                // Wrap tuples in 2D array to match $.precision() convention
-                return Array.isArray(value) ? [value] : value;
+                return copyRequestedValue(value);
             }
 
-            // Wrap tuples in 2D array to match $.precision() convention
-            return Array.isArray(value) ? [value] : value;
+            return copyRequestedValue(value);
         }
 
-        // Buffer to extend date range and ensure bar boundaries are covered: 30 days, or two
-        // bars of the requested timeframe so lookahead_off has a completed bar at the start.
-        const buffer = Math.max(1000 * 60 * 60 * 24 * 30, 2 * reqSeconds * 1000);
+        // Recursive indicators in an HTF secondary need history measured in that
+        // requested timeframe. This is an internal warmup heuristic, not a public
+        // request limit. An explicit calc_bars_count remains provider-owned.
+        const htfWarmupBars = DEFAULT_HTF_WARMUP_BARS;
+        const buffer = isLTF
+            ? Math.max(1000 * 60 * 60 * 24 * 30, 2 * reqSeconds * 1000)
+            : reqSeconds * 1000 * htfWarmupBars;
 
         // Determine start date for secondary context.
         // Use context.sDate if available, otherwise derive from the earliest bar's
         // openTime to ensure the secondary context covers the same time range as the main chart.
         //
-        // When calc_bars_count is set, leave sDate unbounded so the provider returns
-        // the requested number of bars ending at secEDate — the chart's date range
-        // alone may not cover enough HTF bars (e.g. 500 bars at 15m = ~5 days, but a
-        // request for 500 daily bars needs ~500 days of history).
         const effectiveSDate = context.sDate
             || (context.marketData?.length > 0 ? context.marketData[0].openTime : undefined);
+        const boundedBuffer = effectiveSDate === undefined ? buffer : Math.min(buffer, effectiveSDate);
         const adjustedSDate = _calc_bars_count
             ? undefined
-            : (effectiveSDate ? effectiveSDate - buffer : undefined);
+            : (effectiveSDate !== undefined ? effectiveSDate - boundedBuffer : undefined);
 
         // Determine end date for secondary context.
         //
@@ -321,38 +343,29 @@ export function security(context: any) {
         // e.g. a per-bar-varying symbol, from draining the host's provider quota.
         trackRequestContext(context, 'request.security');
 
-        // Pass calc_bars_count as `periods` so the secondary fetches that many bars
-        // ending at secEDate — gives the script the historical depth it asked for.
-        const pineTS = new PineTS(context.source, _symbol, _timeframe, _calc_bars_count, adjustedSDate, secEDate);
+        const pineTS = context.createSecondaryPineTS(
+            context.source,
+            _symbol,
+            _timeframe,
+            _calc_bars_count,
+            adjustedSDate,
+            secEDate,
+            context.hostOptions,
+        );
 
         // Mark as secondary context to prevent infinite recursion
         pineTS.markAsSecondary();
 
-        // Truncated-slice slow path (Phase 4): when the transpiler emitted
-        // a slice for THIS call's expression name, the secondary runs the
-        // prefix-of-statements ending at the call instead of the full
-        // user script. Slice keys are the bare static `pN`; for fn-nested
-        // calls the runtime `_expression_name` is the path-prefixed form
-        // `${$$.id}pN` (commit 812eb2d) — strip the prefix before lookup.
-        // Falls back to running the FULL user script when no slice is
-        // available.
-        const exprNameStr = typeof _expression_name === 'string' ? _expression_name : '';
-        const sliceKey = exprNameStr.match(/p\d+$/)?.[0] ?? exprNameStr;
-        const slice = (context as any)._ltfTruncatedBodies?.[sliceKey];
-        let secContext: any;
         try {
-            secContext = slice
-                ? await pineTS.runPretranspiled(slice)
-                : await pineTS.run(context.pineTSCode);
+            await pineTS.ready();
         } catch (error) {
-            // The data source couldn't provide the requested series. As on
-            // TradingView the script stops with the error, unless the call
-            // passes ignore_invalid_symbol = true: then the series is na.
             if (!_ignore_invalid_symbol) throw error;
+            const message = error instanceof Error ? error.message : String(error);
             context.cache[cacheKey] = { failed: true };
-            context.warn(`request.security(${_symbol}, ${_timeframe}) returns na: ${(error as any)?.message ?? error}`, 'request.security');
+            context.warn(`request.security(${_symbol}, ${_timeframe}) returns na: ${message}`, 'request.security');
             return NaN;
         }
+        const secContext: Context = await runSecondary(context, pineTS, _expression_name);
 
         context.cache[cacheKey] = { pineTS, context: secContext, dataVersion: context.dataVersion };
 
@@ -372,7 +385,9 @@ export function security(context: any) {
             return NaN;
         }
 
-        const value = secContext.params[_expression_name][secContextIdx];
+        const values = secContext.params[_expression_name];
+        if (values === undefined) return NaN;
+        const value = values[secContextIdx];
 
         // Handle gaps for HTF (Higher Timeframe) - First call
         if (!isLTF && _gaps) {
@@ -381,7 +396,6 @@ export function security(context: any) {
             return NaN;
         }
 
-        // Wrap tuples in 2D array to match $.precision() convention
-        return Array.isArray(value) ? [value] : value;
+        return copyRequestedValue(value);
     };
 }

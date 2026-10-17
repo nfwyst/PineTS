@@ -47,6 +47,6 @@ A special `__eq` function handles equality checks, specifically for `NaN`. In Pi
 To regenerate the `math.index.ts` file after adding new methods:
 
 ```bash
-npm run generate:math-index
+bun run generate:math-index
 ```
 

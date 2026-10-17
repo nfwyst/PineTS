@@ -57,13 +57,13 @@ This section documents architectural decisions and code organization patterns in
 **Generation Scripts:**
 
 ```bash
-npm run generate:ta-index
-npm run generate:math-index
-npm run generate:array-index
-npm run generate:map-index
-npm run generate:matrix-index
-npm run generate:input-index
-npm run generate:request-index
+bun run generate:ta-index
+bun run generate:math-index
+bun run generate:array-index
+bun run generate:map-index
+bun run generate:matrix-index
+bun run generate:input-index
+bun run generate:request-index
 ```
 
 **When to Regenerate:** After adding new methods to a namespace's `methods/` folder, you must run the corresponding generation script to update the barrel file.
@@ -72,7 +72,7 @@ npm run generate:request-index
 
 ```typescript
 // This file is auto-generated. Do not edit manually.
-// Run: npm run generate:ta-index
+// Run: bun run generate:ta-index
 ```
 
 **Location:** Generation scripts are located in the [`scripts/`](../../scripts) folder.
@@ -365,14 +365,14 @@ Only a few TA functions return tuples:
 
 ### Case #6: NaN and Floating-Point Equality
 
-**Problem:** Pine Script treats NaN comparisons specially and uses epsilon-based equality for floating-point numbers.
+**Problem:** Pine Script propagates `na` through comparisons and rounds float operands before comparing them.
 
 **Solution:** The transpiler transforms `==` operators to `math.__eq()` calls in a post-processing step.
 
 **Implementation:** The `math.__eq()` function uses:
 
-- **1e-8 tolerance** for floating-point comparisons
-- **Special NaN handling:** Treats `NaN == NaN` as `true` (unlike JavaScript's standard behavior)
+- **Nine fractional digits:** Both float operands are rounded before comparison.
+- **Special `na` handling:** Any comparison with `na` evaluates to `na`.
 
 **Example:**
 

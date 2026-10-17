@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { ParsedTimeframe } from '../timeframe';
+
 /**
  * Pine Script session-string parsing and matching.
  *
@@ -26,6 +28,13 @@ interface SessionWindow {
     /** Minutes from midnight, exclusive. End-of-day midnight is 1440. */
     end: number;
 }
+
+type ZonedDateParts = Readonly<{ year: number; month: number; day: number; hour: number; minute: number }>;
+
+export type SessionGrid = Readonly<{ spec: SessionSpec; timezone: string }>;
+
+/** A grid bar plus midnight UTC of its exchange-local trading-day label. */
+export type SessionBar = Readonly<{ start: number; end: number; tradingDay: number }>;
 
 export interface SessionSpec {
     windows: SessionWindow[];
@@ -71,8 +80,9 @@ export function parseSessionSpec(spec: string): SessionSpec | null {
         if (startHour > 23 || startMin > 59 || endHour > 23 || endMin > 59) return null;
 
         const start = startHour * 60 + startMin;
-        // "0000" as an end time means end-of-day midnight (24:00).
-        const end = endHour === 0 && endMin === 0 ? 1440 : endHour * 60 + endMin;
+        // Only 0000-0000 uses 24:00 to represent a full day. For any later
+        // start, an end of 0000 must stay 0 so the window remains overnight.
+        const end = endHour === 0 && endMin === 0 && start === 0 ? 1440 : endHour * 60 + endMin;
         windows.push({ start, end });
     }
 
@@ -103,4 +113,179 @@ export function isInSessionSpec(spec: SessionSpec, minutesOfDay: number, jsDayOf
         }
     }
     return false;
+}
+
+const DAY_MS = 86_400_000;
+const MINUTE_MS = 60_000;
+const UTC_TIMEZONES = new Set(['UTC', 'GMT', 'Etc/UTC']);
+const formatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function zonedParts(timestamp: number, timezone: string): ZonedDateParts {
+    if (UTC_TIMEZONES.has(timezone)) {
+        const date = new Date(timestamp);
+        return {
+            year: date.getUTCFullYear(),
+            month: date.getUTCMonth() + 1,
+            day: date.getUTCDate(),
+            hour: date.getUTCHours(),
+            minute: date.getUTCMinutes(),
+        };
+    }
+
+    let formatter = formatterCache.get(timezone);
+    if (!formatter) {
+        formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: false,
+        });
+        formatterCache.set(timezone, formatter);
+    }
+    const parts = formatter.formatToParts(new Date(timestamp));
+    const read = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+    const hour = read('hour');
+    return { year: read('year'), month: read('month'), day: read('day'), hour: hour === 24 ? 0 : hour, minute: read('minute') };
+}
+
+function localDayIndex(parts: Pick<ZonedDateParts, 'year' | 'month' | 'day'>): number {
+    return Math.floor(Date.UTC(parts.year, parts.month - 1, parts.day) / DAY_MS);
+}
+
+function localDate(dayIndex: number): Pick<ZonedDateParts, 'year' | 'month' | 'day'> {
+    const date = new Date(dayIndex * DAY_MS);
+    return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
+}
+
+function pineDay(dayIndex: number): number {
+    return new Date(dayIndex * DAY_MS).getUTCDay() + 1;
+}
+
+function localTimestamp(dayIndex: number, minute: number, timezone: string): number {
+    const normalizedDay = dayIndex + Math.floor(minute / 1440);
+    const normalizedMinute = ((minute % 1440) + 1440) % 1440;
+    const date = localDate(normalizedDay);
+    const wallClock = Date.UTC(date.year, date.month - 1, date.day, Math.floor(normalizedMinute / 60), normalizedMinute % 60);
+    if (UTC_TIMEZONES.has(timezone)) return wallClock;
+
+    let timestamp = wallClock;
+    for (let iteration = 0; iteration < 3; iteration++) {
+        const actual = zonedParts(timestamp, timezone);
+        const represented = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute);
+        timestamp += wallClock - represented;
+    }
+    return timestamp;
+}
+
+function windowBounds(window: SessionWindow, tradingDay: number, timezone: string): { start: number; end: number } {
+    const wraps = window.start >= window.end;
+    const startDay = wraps ? tradingDay - 1 : tradingDay;
+    return {
+        start: localTimestamp(startDay, window.start, timezone),
+        end: localTimestamp(tradingDay, window.end, timezone),
+    };
+}
+
+function sessionDayBounds(grid: SessionGrid, tradingDay: number): { start: number; end: number } | null {
+    if (!grid.spec.days.has(pineDay(tradingDay))) return null;
+    const bounds = grid.spec.windows.map((window) => windowBounds(window, tradingDay, grid.timezone));
+    if (bounds.length === 0) return null;
+    return {
+        start: Math.min(...bounds.map((bound) => bound.start)),
+        end: Math.max(...bounds.map((bound) => bound.end)),
+    };
+}
+
+function containingSession(timestamp: number, grid: SessionGrid): { tradingDay: number; segmentStart: number; segmentEnd: number } | null {
+    const parts = zonedParts(timestamp, grid.timezone);
+    const currentDay = localDayIndex(parts);
+    const minute = parts.hour * 60 + parts.minute;
+
+    for (const window of grid.spec.windows) {
+        let tradingDay: number | null = null;
+        if (window.start < window.end) {
+            if (minute >= window.start && minute < window.end) tradingDay = currentDay;
+        } else if (minute >= window.start) {
+            tradingDay = currentDay + 1;
+        } else if (minute < window.end) {
+            tradingDay = currentDay;
+        }
+        if (tradingDay === null || !grid.spec.days.has(pineDay(tradingDay))) continue;
+        const bounds = windowBounds(window, tradingDay, grid.timezone);
+        if (timestamp >= bounds.start && timestamp < bounds.end) {
+            return { tradingDay, segmentStart: bounds.start, segmentEnd: bounds.end };
+        }
+    }
+    return null;
+}
+
+function periodDays(tradingDay: number, timeframe: ParsedTimeframe): { start: number; end: number } {
+    const date = new Date(tradingDay * DAY_MS);
+    if (timeframe.unit === 'D') {
+        const yearStart = Math.floor(Date.UTC(date.getUTCFullYear(), 0, 1) / DAY_MS);
+        const offset = Math.floor((tradingDay - yearStart) / timeframe.multiplier) * timeframe.multiplier;
+        return { start: yearStart + offset, end: yearStart + offset + timeframe.multiplier };
+    }
+    if (timeframe.unit === 'W') {
+        const monday = tradingDay - ((date.getUTCDay() + 6) % 7);
+        const anchor = Math.floor(Date.UTC(1970, 0, 5) / DAY_MS);
+        const width = timeframe.multiplier * 7;
+        const start = anchor + Math.floor((monday - anchor) / width) * width;
+        return { start, end: start + width };
+    }
+    const startMonth = Math.floor((date.getUTCMonth()) / timeframe.multiplier) * timeframe.multiplier;
+    const start = Math.floor(Date.UTC(date.getUTCFullYear(), startMonth, 1) / DAY_MS);
+    const end = Math.floor(Date.UTC(date.getUTCFullYear(), startMonth + timeframe.multiplier, 1) / DAY_MS);
+    return { start, end };
+}
+
+function calendarSessionBar(tradingDay: number, timeframe: ParsedTimeframe, grid: SessionGrid): SessionBar | null {
+    const period = periodDays(tradingDay, timeframe);
+    let first: { start: number; end: number } | null = null;
+    let last: { start: number; end: number } | null = null;
+    let lastTradingDay = tradingDay;
+    for (let day = period.start; day < period.end; day++) {
+        const bounds = sessionDayBounds(grid, day);
+        if (!bounds) continue;
+        first ??= bounds;
+        last = bounds;
+        lastTradingDay = day;
+    }
+    return first && last ? { start: first.start, end: last.end, tradingDay: lastTradingDay * DAY_MS } : null;
+}
+
+export function createSessionGrid(session: unknown, timezone: unknown): SessionGrid | null {
+    if (typeof session !== 'string' || session.trim() === '24x7' || typeof timezone !== 'string') return null;
+    const spec = parseSessionSpec(session);
+    return spec ? { spec, timezone } : null;
+}
+
+export function resolveSessionGrid(syminfo: unknown, openTimes: readonly number[]): SessionGrid | null {
+    if (syminfo === null || typeof syminfo !== 'object') return null;
+    const timezone = Reflect.get(syminfo, 'timezone');
+    const regular = createSessionGrid(Reflect.get(syminfo, 'session'), timezone);
+    const extended = createSessionGrid(Reflect.get(syminfo, 'session_extended'), timezone);
+    if (!extended) return regular;
+    if (!regular) return extended;
+    const carriesExtendedBars = openTimes.some((time) => containingSession(time, extended) !== null && containingSession(time, regular) === null);
+    return carriesExtendedBars ? extended : regular;
+}
+
+export function sessionTimeframeBar(timestamp: number, timeframe: ParsedTimeframe, grid: SessionGrid): SessionBar | null {
+    const session = containingSession(timestamp, grid);
+    if (!session) return null;
+    if (timeframe.unit === 'D' || timeframe.unit === 'W' || timeframe.unit === 'M') {
+        return calendarSessionBar(session.tradingDay, timeframe, grid);
+    }
+
+    const duration = timeframe.multiplier * (timeframe.unit === 'S' ? 1000 : MINUTE_MS);
+    const start = session.segmentStart + Math.floor((timestamp - session.segmentStart) / duration) * duration;
+    return {
+        start,
+        end: Math.min(start + duration, session.segmentEnd),
+        tradingDay: session.tradingDay * DAY_MS,
+    };
 }

@@ -153,3 +153,10 @@ tests/automated
 CLAUDE.md 
 MEMORY.md
 .claude
+
+# Local agent and release scratch data
+.omo/
+.tmp-nfwyst-push-*/
+
+# Bun is the canonical package manager; keep its text lockfile versioned.
+!bun.lock

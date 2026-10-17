@@ -17,6 +17,8 @@
 import { describe, it, expect } from 'vitest';
 import { PineTS } from '../../../src/PineTS.class';
 import { Provider } from '@pinets/marketData/Provider.class';
+import type { Context } from '../../../src/Context.class';
+import type { AlertEvent } from '../../../src/types/PineTypes';
 
 describe('Alert System', () => {
     const startDate = new Date('2024-01-01').getTime();
@@ -123,6 +125,72 @@ describe('Alert System', () => {
         });
     });
 
+    describe('alert() - PineTS object messages', () => {
+        it('accepts an object message in the exported AlertEvent type', () => {
+            const event: AlertEvent = {
+                type: 'alert',
+                id: 'type-proof',
+                message: { alert: 'RSI above 70', nested: { values: [70, 71] } },
+                freq: 'all',
+                bar_index: 0,
+                time: 0,
+            };
+
+            expect(event.message).toEqual({ alert: 'RSI above 70', nested: { values: [70, 71] } });
+        });
+
+        it('preserves an object message reference through run()', async () => {
+            const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'D', null, startDate, endDate);
+            const code = ($: Context) => {
+                const payload = { alert: 'RSI above 70', nested: { values: [70, 71] } };
+                $.pine.alert.any(payload, $.pine.alert.freq_all);
+                return { payload };
+            };
+
+            const ctx = await pineTS.run(code);
+            const latestPayload = ctx.result.payload.at(-1);
+
+            expect(ctx.alerts).toHaveLength(1);
+            expect(ctx.alerts[0].message).toBe(latestPayload);
+            expect(ctx.alerts[0].message).toEqual({ alert: 'RSI above 70', nested: { values: [70, 71] } });
+        });
+
+        it('preserves an object message reference through stream()', async () => {
+            const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'D', null, startDate, endDate);
+            await pineTS.ready();
+            const code = ($: Context) => {
+                const payload = { alert: 'RSI above 70', nested: { values: [70, 71] } };
+                $.pine.alert.any(payload, $.pine.alert.freq_all);
+                return { payload };
+            };
+
+            let emittedAlert: AlertEvent | undefined;
+            let latestPayload: unknown;
+            await new Promise<void>((resolve, reject) => {
+                const stream = pineTS.stream(code, { live: false });
+                const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
+
+                stream.on('data', (ctx: Context) => {
+                    latestPayload = ctx.result.payload.at(-1);
+                });
+
+                stream.on('alert', (alert: AlertEvent) => {
+                    emittedAlert = alert;
+                    clearTimeout(timeout);
+                    resolve();
+                });
+
+                stream.on('error', (error: unknown) => {
+                    clearTimeout(timeout);
+                    reject(error);
+                });
+            });
+
+            expect(emittedAlert?.message).toBe(latestPayload);
+            expect(emittedAlert?.message).toEqual({ alert: 'RSI above 70', nested: { values: [70, 71] } });
+        });
+    });
+
     describe('alert() - transpiler callsite IDs', () => {
         it('should assign stable __callsiteId via transpiler', async () => {
             const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'D', null, startDate, endDate);
@@ -202,6 +270,7 @@ plot(close)
             expect(ctx.alerts.length).toBeGreaterThan(0);
             expect(ctx.alerts[0].type).toBe('alert');
             expect(ctx.alerts[0].message).toBe('Bullish bar!');
+            expect(typeof ctx.alerts[0].message).toBe('string');
             expect(ctx.alerts[0].freq).toBe('once_per_bar');
         });
     });

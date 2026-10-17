@@ -1,11 +1,35 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // This file is auto-generated. Do not edit manually.
-// Run: npm run generate:array-index
+// Run: bun run generate:array-index
 
 export { PineArrayObject } from './PineArrayObject';
 
 import { PineArrayObject } from './PineArrayObject';
+import { __from_int } from './methods/__from_int';
+import { abs } from './methods/abs';
+import { avg } from './methods/avg';
+import { binary_search } from './methods/binary_search';
+import { binary_search_leftmost } from './methods/binary_search_leftmost';
+import { binary_search_rightmost } from './methods/binary_search_rightmost';
+import { clear } from './methods/clear';
+import { concat } from './methods/concat';
+import { copy } from './methods/copy';
+import { covariance } from './methods/covariance';
+import { every } from './methods/every';
+import { fill } from './methods/fill';
+import { first } from './methods/first';
 import { from } from './methods/from';
+import { get } from './methods/get';
+import { includes } from './methods/includes';
+import { indexof } from './methods/indexof';
+import { insert } from './methods/insert';
+import { join } from './methods/join';
+import { last } from './methods/last';
+import { lastindexof } from './methods/lastindexof';
+import { max } from './methods/max';
+import { median } from './methods/median';
+import { min } from './methods/min';
+import { mode } from './methods/mode';
 import { new_fn } from './methods/new';
 import { new_bool } from './methods/new_bool';
 import { new_box } from './methods/new_box';
@@ -18,7 +42,26 @@ import { new_linefill } from './methods/new_linefill';
 import { new_string } from './methods/new_string';
 import { new_table } from './methods/new_table';
 import { param } from './methods/param';
-import { __from_int } from './methods/__from_int';
+import { percentile_linear_interpolation } from './methods/percentile_linear_interpolation';
+import { percentile_nearest_rank } from './methods/percentile_nearest_rank';
+import { percentrank } from './methods/percentrank';
+import { pop } from './methods/pop';
+import { push } from './methods/push';
+import { range } from './methods/range';
+import { remove } from './methods/remove';
+import { reverse } from './methods/reverse';
+import { set } from './methods/set';
+import { shift } from './methods/shift';
+import { size } from './methods/size';
+import { slice } from './methods/slice';
+import { some } from './methods/some';
+import { sort } from './methods/sort';
+import { sort_indices } from './methods/sort_indices';
+import { standardize } from './methods/standardize';
+import { stdev } from './methods/stdev';
+import { sum } from './methods/sum';
+import { unshift } from './methods/unshift';
+import { variance } from './methods/variance';
 
 export class PineArray {
   [key: string]: any;
@@ -26,30 +69,31 @@ export class PineArray {
   constructor(private context: any) {
 
     // Install methods
-    this.abs = (id: PineArrayObject, ...args: any[]) => id.abs(...args);
-    this.avg = (id: PineArrayObject, ...args: any[]) => id.avg(...args);
-    this.binary_search = (id: PineArrayObject, ...args: any[]) => id.binary_search(...args);
-    this.binary_search_leftmost = (id: PineArrayObject, ...args: any[]) => id.binary_search_leftmost(...args);
-    this.binary_search_rightmost = (id: PineArrayObject, ...args: any[]) => id.binary_search_rightmost(...args);
-    this.clear = (id: PineArrayObject, ...args: any[]) => id.clear(...args);
-    this.concat = (id: PineArrayObject, ...args: any[]) => id.concat(...args);
-    this.copy = (id: PineArrayObject, ...args: any[]) => id.copy(...args);
-    this.covariance = (id: PineArrayObject, ...args: any[]) => id.covariance(...args);
-    this.every = (id: PineArrayObject, ...args: any[]) => id.every(...args);
-    this.fill = (id: PineArrayObject, ...args: any[]) => id.fill(...args);
-    this.first = (id: PineArrayObject, ...args: any[]) => id.first(...args);
+    this.__from_int = __from_int(context);
+    this.abs = abs(context);
+    this.avg = avg(context);
+    this.binary_search = binary_search(context);
+    this.binary_search_leftmost = binary_search_leftmost(context);
+    this.binary_search_rightmost = binary_search_rightmost(context);
+    this.clear = clear(context);
+    this.concat = concat(context);
+    this.copy = copy(context);
+    this.covariance = covariance(context);
+    this.every = every(context);
+    this.fill = fill(context);
+    this.first = first(context);
     this.from = from(context);
-    this.get = (id: PineArrayObject, ...args: any[]) => id.get(...args);
-    this.includes = (id: PineArrayObject, ...args: any[]) => id.includes(...args);
-    this.indexof = (id: PineArrayObject, ...args: any[]) => id.indexof(...args);
-    this.insert = (id: PineArrayObject, ...args: any[]) => id.insert(...args);
-    this.join = (id: PineArrayObject, ...args: any[]) => id.join(...args);
-    this.last = (id: PineArrayObject, ...args: any[]) => id.last(...args);
-    this.lastindexof = (id: PineArrayObject, ...args: any[]) => id.lastindexof(...args);
-    this.max = (id: PineArrayObject, ...args: any[]) => id.max(...args);
-    this.median = (id: PineArrayObject, ...args: any[]) => id.median(...args);
-    this.min = (id: PineArrayObject, ...args: any[]) => id.min(...args);
-    this.mode = (id: PineArrayObject, ...args: any[]) => id.mode(...args);
+    this.get = get(context);
+    this.includes = includes(context);
+    this.indexof = indexof(context);
+    this.insert = insert(context);
+    this.join = join(context);
+    this.last = last(context);
+    this.lastindexof = lastindexof(context);
+    this.max = max(context);
+    this.median = median(context);
+    this.min = min(context);
+    this.mode = mode(context);
     this.new = new_fn(context);
     this.new_bool = new_bool(context);
     this.new_box = new_box(context);
@@ -62,27 +106,26 @@ export class PineArray {
     this.new_string = new_string(context);
     this.new_table = new_table(context);
     this.param = param(context);
-    this.percentile_linear_interpolation = (id: PineArrayObject, ...args: any[]) => id.percentile_linear_interpolation(...args);
-    this.percentile_nearest_rank = (id: PineArrayObject, ...args: any[]) => id.percentile_nearest_rank(...args);
-    this.percentrank = (id: PineArrayObject, ...args: any[]) => id.percentrank(...args);
-    this.pop = (id: PineArrayObject, ...args: any[]) => id.pop(...args);
-    this.push = (id: PineArrayObject, ...args: any[]) => id.push(...args);
-    this.range = (id: PineArrayObject, ...args: any[]) => id.range(...args);
-    this.remove = (id: PineArrayObject, ...args: any[]) => id.remove(...args);
-    this.reverse = (id: PineArrayObject, ...args: any[]) => id.reverse(...args);
-    this.set = (id: PineArrayObject, ...args: any[]) => id.set(...args);
-    this.shift = (id: PineArrayObject, ...args: any[]) => id.shift(...args);
-    this.size = (id: PineArrayObject, ...args: any[]) => id.size(...args);
-    this.slice = (id: PineArrayObject, ...args: any[]) => id.slice(...args);
-    this.some = (id: PineArrayObject, ...args: any[]) => id.some(...args);
-    this.sort = (id: PineArrayObject, ...args: any[]) => id.sort(...args);
-    this.sort_indices = (id: PineArrayObject, ...args: any[]) => id.sort_indices(...args);
-    this.standardize = (id: PineArrayObject, ...args: any[]) => id.standardize(...args);
-    this.stdev = (id: PineArrayObject, ...args: any[]) => id.stdev(...args);
-    this.sum = (id: PineArrayObject, ...args: any[]) => id.sum(...args);
-    this.unshift = (id: PineArrayObject, ...args: any[]) => id.unshift(...args);
-    this.variance = (id: PineArrayObject, ...args: any[]) => id.variance(...args);
-    this.__from_int = __from_int(context);
+    this.percentile_linear_interpolation = percentile_linear_interpolation(context);
+    this.percentile_nearest_rank = percentile_nearest_rank(context);
+    this.percentrank = percentrank(context);
+    this.pop = pop(context);
+    this.push = push(context);
+    this.range = range(context);
+    this.remove = remove(context);
+    this.reverse = reverse(context);
+    this.set = set(context);
+    this.shift = shift(context);
+    this.size = size(context);
+    this.slice = slice(context);
+    this.some = some(context);
+    this.sort = sort(context);
+    this.sort_indices = sort_indices(context);
+    this.standardize = standardize(context);
+    this.stdev = stdev(context);
+    this.sum = sum(context);
+    this.unshift = unshift(context);
+    this.variance = variance(context);
   }
 }
 

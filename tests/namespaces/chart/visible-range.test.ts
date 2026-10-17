@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { PineTS, Provider } from 'index';
+import { Indicator, PineTS, Provider } from 'index';
 
 const makePineTS = () =>
     new PineTS(Provider.Mock, 'BTCUSDC', 'D', null,
@@ -161,6 +161,56 @@ plot(close, "c")
         );
         const ctx2 = await pine.update();
         expect(ctx2).toBe(ctx1); // cached — viewport change is irrelevant
+    });
+
+    it('update() re-runs when the script source changes', async () => {
+        const pine = makePineTS();
+        const ctx1 = await pine.update(codeNoVR);
+        const ctx2 = await pine.update(`
+//@version=5
+indicator("changed-source")
+plot(open, "o")
+`);
+
+        expect(ctx2).not.toBe(ctx1);
+        expect(ctx2.plots.o).toBeDefined();
+        expect(ctx2.plots.c).toBeUndefined();
+    });
+
+    it('update() re-runs when an Indicator input override changes', async () => {
+        const pine = makePineTS();
+        const indicator = new Indicator(`
+//@version=6
+indicator("changed-input")
+length = input.int(1, "Length")
+plot(length, "value")
+`);
+        const ctx1 = await pine.update(indicator);
+
+        indicator.input.Length = 2;
+        const ctx2 = await pine.update(indicator);
+
+        expect(ctx2).not.toBe(ctx1);
+        expect(lastValue(ctx1.plots, 'value')).toBe(1);
+        expect(lastValue(ctx2.plots, 'value')).toBe(2);
+    });
+
+    it('update() re-runs when the legacy Indicator.inputs map changes', async () => {
+        const pine = makePineTS();
+        const indicator = new Indicator(`
+//@version=6
+indicator("changed-legacy-input")
+length = input.int(1, "Length")
+plot(length, "value")
+`, { Length: 1 });
+        const ctx1 = await pine.update(indicator);
+
+        indicator.inputs.Length = 2;
+        const ctx2 = await pine.update(indicator);
+
+        expect(ctx2).not.toBe(ctx1);
+        expect(lastValue(ctx1.plots, 'value')).toBe(1);
+        expect(lastValue(ctx2.plots, 'value')).toBe(2);
     });
 
     it('throws if no code is provided on the first call', async () => {

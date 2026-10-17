@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env bun
 
 /**
  * Generate expected test data by running an indicator
@@ -9,23 +9,24 @@
  * 3. Outputs expected results and plot data as JSON
  *
  * Usage as CLI:
- *   tsx expect-gen.ts <indicator-file> [output-json-file]
- *   cat indicator.ts | tsx expect-gen.ts - [output-json-file]
+ *   bun run expect-gen.ts <indicator-file> [output-json-file]
+ *   cat indicator.ts | bun run expect-gen.ts - [output-json-file]
  *
  * Usage as module:
  *   import { generateExpectedData } from './expect-gen.js';
  *   const data = await generateExpectedData(indicatorCode, outputPath?);
  *
  * Examples:
- *   tsx expect-gen.ts indicator.ts output.json
- *   cat indicator.ts | tsx expect-gen.ts - output.json
- *   echo "(context) => ({ value: context.data.close[0] })" | tsx expect-gen.ts -
+ *   bun run expect-gen.ts indicator.ts output.json
+ *   cat indicator.ts | bun run expect-gen.ts - output.json
+ *   echo "(context) => ({ value: context.data.close[0] })" | bun run expect-gen.ts -
  */
 
 import { PineTS } from '@pinets/index';
 import { Provider } from '@pinets/marketData/Provider.class';
 import * as fs from 'fs';
 import * as path from 'path';
+import { pathToFileURL } from 'url';
 import { serialize } from './lib/serializer.js';
 
 interface ExpectedData {
@@ -117,18 +118,19 @@ export async function generateExpectedData(indicatorCode: string, outputPath?: s
 }
 
 // CLI usage
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+const entryPath = process.argv[1];
+if (entryPath !== undefined && import.meta.url === pathToFileURL(entryPath).href) {
     const args = process.argv.slice(2);
 
     if (args.length === 0) {
-        console.error('Usage: tsx expect-gen.ts <indicator-file> [output-json-file]');
-        console.error('   or: cat indicator.ts | tsx expect-gen.ts - [output-json-file]');
+        console.error('Usage: bun run expect-gen.ts <indicator-file> [output-json-file]');
+        console.error('   or: cat indicator.ts | bun run expect-gen.ts - [output-json-file]');
         console.error('');
         console.error('Examples:');
-        console.error('  tsx expect-gen.ts indicator.ts');
-        console.error('  tsx expect-gen.ts indicator.ts output.json');
-        console.error('  cat indicator.ts | tsx expect-gen.ts -');
-        console.error('  cat indicator.ts | tsx expect-gen.ts - output.json');
+        console.error('  bun run expect-gen.ts indicator.ts');
+        console.error('  bun run expect-gen.ts indicator.ts output.json');
+        console.error('  cat indicator.ts | bun run expect-gen.ts -');
+        console.error('  cat indicator.ts | bun run expect-gen.ts - output.json');
         process.exit(1);
     }
 

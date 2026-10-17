@@ -315,9 +315,43 @@ plot(tick_counter)
         const result = transpile(code);
         const jsCode = result.toString();
 
-        // varip uses initVar like var
+        // varip uses persistent initialization but a distinct intrabar store.
         expect(jsCode).toContain('$.initVar(');
-        expect(jsCode).toContain('$.var.glb1_tick_counter');
+        expect(jsCode).toContain('$.varip.glb1_tick_counter');
+    });
+
+    it('does not reinterpret a PineTS string literal as varip metadata', () => {
+        // Given
+        const code = `($) => {
+            "__pineVaripDeclaration__";
+            var counter = 0;
+            counter += 1;
+            return counter;
+        }`;
+
+        // When
+        const jsCode = transpile(code).toString();
+
+        // Then
+        expect(jsCode).toContain('$.var.glb1_counter');
+        expect(jsCode).not.toContain('$.varip.glb1_counter');
+    });
+
+    it('does not reinterpret a Pine string literal as varip metadata', () => {
+        // Given
+        const code = `//@version=6
+indicator("Marker collision")
+"__pineVaripDeclaration__"
+var int counter = 0
+counter += 1
+plot(counter)`;
+
+        // When
+        const jsCode = transpile(code).toString();
+
+        // Then
+        expect(jsCode).toContain('$.var.glb1_counter');
+        expect(jsCode).not.toContain('$.varip.glb1_counter');
     });
 
     it('should transpile reassignment operator :=', () => {
@@ -378,8 +412,8 @@ plot(gt ? 1 : 0)
         const result = transpile(code);
         const jsCode = result.toString();
 
-        // Relational operators route through na-aware helpers (na propagation
-        // + 1e-10 tolerance), same as == / != .
+        // Relational operators route through the same na-aware, nine-digit
+        // comparison helpers as == / !=.
         expect(jsCode).toContain('$.pine.math.__eq(');
         expect(jsCode).toContain('$.pine.math.__neq(');
         expect(jsCode).toContain('$.pine.math.__gt(');
@@ -1188,6 +1222,25 @@ plot(close)
             expect(jsCode).toContain('$.let.glb1_prices = $.init($.let.glb1_prices, na.__value)');
             // Should NOT produce standalone 'array;' expression
             expect(jsCode).not.toMatch(/^\s*array\s*;/m);
+        });
+
+        it('should transpile const array and const dotted generic syntax', () => {
+            const code = `
+//@version=6
+indicator("Qualified Generics")
+
+const array<float> prices = array.new<float>()
+const array<chart.point> points = array.new<chart.point>()
+
+plot(array.size(prices) + array.size(points))
+            `;
+
+            const jsCode = transpile(code).toString();
+
+            expect(jsCode).toContain('$.let.glb1_prices');
+            expect(jsCode).toContain('"__pineTypedVar:prices=const array<float>"');
+            expect(jsCode).toContain('$.let.glb1_points');
+            expect(jsCode).toContain('"__pineTypedVar:points=const array<chart.point>"');
         });
 
         it('should transpile var float[] with array shorthand', () => {

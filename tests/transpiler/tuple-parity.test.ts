@@ -220,6 +220,31 @@ describe('Tuples passed to request.security', () => {
         );
         for (const series of Object.values(v)) expect(new Set(series)).toEqual(new Set([1]));
     });
+
+    it('time helper tuple returned by a function keeps direct and history values through request.security', async () => {
+        expect(
+            await firstValues(
+                [
+                    'f() => [time, time_close, hour, time[1], time_close[1], hour[1]]',
+                    '[t, tc, h, pt, ptc, ph] = request.security(syminfo.tickerid, timeframe.period, f())',
+                    'dt = t - time',
+                    'dtc = tc - time_close',
+                    'dh = h - hour',
+                    'dpt = pt - time[1]',
+                    'dptc = ptc - time_close[1]',
+                    'dph = ph - hour[1]',
+                ],
+                ['dt', 'dtc', 'dh', 'dpt', 'dptc', 'dph'],
+            ),
+        ).toEqual({
+            dt: [0, 0, 0, 0, 0],
+            dtc: [0, 0, 0, 0, 0],
+            dh: [0, 0, 0, 0, 0],
+            dpt: [NaN, 0, 0, 0, 0],
+            dptc: [NaN, 0, 0, 0, 0],
+            dph: [NaN, 0, 0, 0, 0],
+        });
+    });
 });
 
 describe('Tuples passed to request.security_lower_tf', () => {
@@ -252,6 +277,23 @@ describe('Tuples passed to request.security_lower_tf', () => {
         expect(new Set(v.ev)).toEqual(new Set([1]));
         expect(new Set(v.ek)).toEqual(new Set([1]));
         expect(new Set(v.n)).toEqual(new Set([24]));
+    });
+
+    it('a nonempty time tuple contains numeric time and time_close timestamps', async () => {
+        const values = await plotValues(
+            [
+                '[times, closeTimes] = request.security_lower_tf(syminfo.tickerid, "60", [time, time_close])',
+                'firstTime = times.size() > 0 ? times.first() : na',
+                'firstCloseTime = closeTimes.size() > 0 ? closeTimes.first() : na',
+            ],
+            ['firstTime', 'firstCloseTime'],
+            'D',
+            '2024-01-03',
+        );
+        const timestamps = [...values.firstTime, ...values.firstCloseTime].filter((value) => !Number.isNaN(value));
+
+        expect(timestamps.length).toBeGreaterThan(0);
+        expect(timestamps.every((value) => typeof value === 'number' && Number.isFinite(value))).toBe(true);
     });
 });
 

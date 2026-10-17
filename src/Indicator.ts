@@ -10,4 +10,13 @@ export type {
     PineInputDisplay,
     PinePropType,
     PreparedScript,
+    IndicatorPrepareOptions,
 } from './Indicator/types';
+export type {
+    AlertEvent,
+    ChartTheme,
+    LibraryImportRequest,
+    LibraryResolver,
+    PineTSOptions,
+    ResolvedPineTSOptions,
+} from './types/PineTypes';

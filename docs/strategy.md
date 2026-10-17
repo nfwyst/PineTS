@@ -39,7 +39,7 @@ Every example below is exercised by a verification harness at `PineTS/.scratchpa
 ## Quickstart
 
 ```javascript
-const { PineTS } = require('pinets');
+const { PineTS } = require('@nfwyst/pinets');
 
 const data = [/* …OHLCV bars… */];
 const pine = new PineTS(data);
@@ -90,7 +90,7 @@ const ctx = await pine.run(code);
 
 // (b) Wrapped in Indicator() — required when you need to override input.* values
 //     at runtime (the keys must match each input's title argument).
-const { Indicator } = require('pinets');
+const { Indicator } = require('@nfwyst/pinets');
 const ctx2 = await pine.run(new Indicator(code));                    // no overrides
 const ctx3 = await pine.run(new Indicator(code, { Qty: 5 }));        // override input.int(1, "Qty")
 ```
@@ -121,7 +121,7 @@ await pine.run(($) => {
 
 After the call, `context.strategy.config` holds the merged options (defaults + your overrides) and the rest of `context.strategy` is initialized — see the [object reference below](#the-contextstrategy-object).
 
-**Supported options** (every field is `StrategyConfig` in [`PineTS/src/namespaces/strategy/types.ts`](https://github.com/LuxAlgo/PineTS/blob/main/src/namespaces/strategy/types.ts)):
+**Supported options** (every field is `StrategyConfig` in [`PineTS/src/namespaces/strategy/types.ts`](https://github.com/nfwyst/PineTS/blob/main/src/namespaces/strategy/types.ts)):
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
@@ -150,7 +150,7 @@ PineTS implements the same order lifecycle as TradingView:
 2. **On bar N+1's open, the engine processes it** — fills it if market, or checks limit/stop conditions. Slippage and commissions are applied at fill time.
 3. **Position-mutating events** (open / close / reverse) are mirrored on the flat scalars (`position_size`, `position_avg_price`, `position_entry_name`).
 
-Internal lifecycle is handled by `processStrategyOrders()` and `processExitOrders()` in [`strategy/utils.ts`](https://github.com/LuxAlgo/PineTS/blob/main/src/namespaces/strategy/utils.ts), invoked at the start of every bar.
+Internal lifecycle is handled by `processStrategyOrders()` and `processExitOrders()` in [`strategy/utils.ts`](https://github.com/nfwyst/PineTS/blob/main/src/namespaces/strategy/utils.ts), invoked at the start of every bar.
 
 ### `strategy.order()`
 
@@ -247,7 +247,7 @@ if ($.idx === 1) {
 
 ## The `context.strategy` object
 
-After `strategy()` is declared, `context.strategy` exposes the live state — the same object every getter reads from. It's documented in [`StrategyState`](https://github.com/LuxAlgo/PineTS/blob/main/src/namespaces/strategy/types.ts):
+After `strategy()` is declared, `context.strategy` exposes the live state — the same object every getter reads from. It's documented in [`StrategyState`](https://github.com/nfwyst/PineTS/blob/main/src/namespaces/strategy/types.ts):
 
 ```typescript
 interface StrategyState {

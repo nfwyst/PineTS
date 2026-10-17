@@ -378,7 +378,7 @@ plot(close)
         // `delete_$0` while the call site looked up `delete`, so
         // `obj.delete()` was a silent no-op and the inner line was never
         // marked deleted.
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', '1W', null,
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', '1W', null,
             new Date('2018-12-15').getTime(),
             new Date('2019-04-01').getTime());
         const code = `
@@ -408,7 +408,7 @@ plot(close)
     // the AnalysisPass picks up. Without this, `r.delete()` would fall back
     // to the no-op direct property access on a PineTypeObject.
     it('runtime: UDT retrieved from an array dispatches user methods correctly', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', '1W', null,
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', '1W', null,
             new Date('2018-12-15').getTime(),
             new Date('2019-04-01').getTime());
         const code = `
@@ -441,7 +441,7 @@ plot(close)
     // into `$M_delete(someLine)` (which would try `someLine.ln.delete()`
     // and fail silently because lines don't have an `ln` field).
     it('runtime: UFCS retargeting is type-aware (built-in line.delete keeps working)', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', '1W', null,
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', '1W', null,
             new Date('2018-12-15').getTime(),
             new Date('2019-04-01').getTime());
         const code = `
@@ -474,7 +474,7 @@ plot(close)
     // Subsequent `thing.foo()` call sites then fell out of UFCS retargeting
     // because `isUdtInstance('thing')` returned false at the call site.
     it('runtime: param name that shadows outer UDT variable does not break dispatch', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', '1W', null,
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', '1W', null,
             new Date('2018-12-15').getTime(),
             new Date('2019-04-01').getTime());
         const code = `

@@ -205,7 +205,7 @@ plot(math.random(0, 1, 1), "s1")`);
         [0.7308781907032909, 0.41008081149220166].forEach((want, i) => close(s1[i], want, 8));
         a.forEach((x, i) => {
             close(b[i], 10 + 10 * x, 6);
-            // user function results go through $.precision (10 decimals)
+            // User function results retain Pine's internal float precision.
             close(c[i], x, 9);
             close(d[i], x, 9);
         });

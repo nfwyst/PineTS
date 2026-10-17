@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Context, PineTS, Provider } from 'index';
+import { normalizeNumericGraph, normalizePlotString } from '../../utils';
 
 describe('Array Access & Information', () => {
     it('SET, GET, FIRST', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'W', 500, 0, new Date('Jan 20 2025').getTime() - 1);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDT', 'W', 500, 0, new Date('Jan 20 2025').getTime() - 1);
 
         const { result } = await pineTS.run((context) => {
             const array = context.array;
@@ -28,12 +29,12 @@ describe('Array Access & Information', () => {
         const expected_arr_val = [99, 99, 99, 99, 99];
         const expected_first = [101331.57, 94545.06, 98363.61, 93738.2, 95186.27];
 
-        expect(part_arr_val).toEqual(expected_arr_val);
-        expect(part_first).toEqual(expected_first);
+        expect(normalizeNumericGraph(part_arr_val)).toEqual(normalizeNumericGraph(expected_arr_val));
+        expect(normalizeNumericGraph(part_first)).toEqual(normalizeNumericGraph(expected_first));
     });
 
     it('SET, GET, FIRST from Array Object', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'W', 500, 0, new Date('Jan 20 2025').getTime() - 1);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDT', 'W', 500, 0, new Date('Jan 20 2025').getTime() - 1);
 
         const { result } = await pineTS.run((context) => {
             const array = context.array;
@@ -58,8 +59,8 @@ describe('Array Access & Information', () => {
         const expected_arr_val = [99, 99, 99, 99, 99];
         const expected_first = [101331.57, 94545.06, 98363.61, 93738.2, 95186.27];
 
-        expect(part_arr_val).toEqual(expected_arr_val);
-        expect(part_first).toEqual(expected_first);
+        expect(normalizeNumericGraph(part_arr_val)).toEqual(normalizeNumericGraph(expected_arr_val));
+        expect(normalizeNumericGraph(part_first)).toEqual(normalizeNumericGraph(expected_first));
     });
 
     it('GET, SET, LAST, SIZE', async () => {
@@ -119,7 +120,7 @@ describe('Array Access & Information', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('FILL', async () => {
@@ -173,6 +174,6 @@ describe('Array Access & Information', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });

@@ -84,7 +84,7 @@ describe('closeTime normalization — PineTS safety-net (array-based data)', () 
         expect(result.tc[1]).toBe(1547424000000 + oneWeekMs);
     });
 
-    it('uses provider closeTime when available (no override)', async () => {
+    it('preserves explicit closeTime in the normalized view', async () => {
         // Array-based data WITH closeTime already set
         const arrayData = [
             { openTime: 1546819200000, open: 3800, high: 3900, low: 3700, close: 3850, volume: 100, closeTime: 1547424000000 },
@@ -92,15 +92,16 @@ describe('closeTime normalization — PineTS safety-net (array-based data)', () 
         ];
 
         const pineTS = new PineTS(arrayData, 'TEST', 'W');
-        const { result } = await pineTS.run(($) => {
+        const context = await pineTS.run(($) => {
             const { time_close } = $.pine;
             let tc = time_close;
             return { tc };
         });
 
         // Should use provider-supplied closeTime, not compute from timeframe
-        expect(result.tc[0]).toBe(1547424000000);
-        expect(result.tc[1]).toBe(1548028800000);
+        expect(context.result.tc[0]).toBe(1547424000000);
+        expect(context.result.tc[1]).toBe(1548028800000);
+        expect(context.normalizedCloseTime).toEqual([1547424000000, 1548028800000]);
     });
 
     it('defaults to 1D duration when timeframe is undefined', async () => {

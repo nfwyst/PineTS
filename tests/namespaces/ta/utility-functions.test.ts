@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrayPrecision, getKlines, runNSFunctionWithArgs } from '../../utils';
+import { arrayPrecision, getKlines, normalizePlotString, runNSFunctionWithArgs } from '../../utils';
 
 import { Context, PineTS, Provider } from 'index';
 
@@ -48,7 +48,7 @@ describe('Technical Analysis - Volume Indicators', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('BARSSINCE - Bars Since Condition', async () => {
@@ -104,7 +104,7 @@ describe('Technical Analysis - Volume Indicators', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('VALUEWHEN - Value When Condition Met', async () => {
@@ -162,6 +162,6 @@ describe('Technical Analysis - Volume Indicators', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });

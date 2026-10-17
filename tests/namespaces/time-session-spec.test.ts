@@ -144,6 +144,24 @@ plot(na(t) ? 0 : 1, "in")
         }
     });
 
+    it('keeps "0000-0000" as a full trading day', async () => {
+        // Given: a full-day session restricted to Mondays.
+        const code = `
+//@version=6
+indicator("full trading day")
+t = time(timeframe.period, "0000-0000:2", "UTC")
+plot(na(t) ? 0 : 1, "in")
+`;
+
+        // When: the session is evaluated across two complete weeks.
+        const { plots } = await makePineTS().run(code);
+
+        // Then: every Monday hour remains in-session and every other day stays out.
+        for (const point of plots['in'].data) {
+            expect(point.value).toBe(new Date(point.time).getUTCDay() === 1 ? 1 : 0);
+        }
+    });
+
     it('rejects malformed session strings instead of treating every bar as in-session', async () => {
         const code = `
 //@version=5

@@ -46,6 +46,6 @@ While JavaScript is loosely typed, Pine Script arrays are typed (`float[]`, `int
 To regenerate the `array.index.ts` file:
 
 ```bash
-npm run generate:array-index
+bun run generate:array-index
 ```
 

@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { Series } from '../../../Series';
+import { clonePineGraph } from '../../../core/clonePineGraph';
 
 export function param(context: any) {
     return (source: any, index: any, name?: string) => {
         if (!context.params[name]) context.params[name] = [];
 
         let val;
+        let tupleArity: number | undefined;
         if (source instanceof Series) {
             // Source is a Series - extract the value at index
             val = source.get(index || 0);
@@ -25,20 +27,29 @@ export function param(context: any) {
             const isTuple = (hasAnySeries || hasOnlyScalars) && source.length >= 1;
 
             if (isTuple) {
-                // Extract current value from each element (Series → .get(0), scalars pass through)
-                val = source.map((elem: any) => elem instanceof Series ? elem.get(0) : elem);
+                // Series and dual-use helpers such as time/time_close both resolve here.
+                val = source.map((elem: unknown) => {
+                    if (elem instanceof Series) return elem.get(0);
+                    if (elem !== null && typeof elem === 'object' && '__value' in elem) {
+                        return Series.from(elem).get(0);
+                    }
+                    return elem;
+                });
+                tupleArity = source.length;
             } else {
                 // Time-series array - extract value at index
                 val = Series.from(source).get(index || 0);
+                if (Array.isArray(val)) tupleArity = val.length;
             }
         } else {
             val = source;
         }
 
+        const storedVal = clonePineGraph(val);
         if (context.params[name].length === 0) {
-            context.params[name].push(val);
+            context.params[name].push(storedVal);
         } else {
-            context.params[name][context.params[name].length - 1] = val;
+            context.params[name][context.params[name].length - 1] = storedVal;
         }
 
         // Preserve the ORIGINAL source (with Series identity intact, before
@@ -50,6 +61,11 @@ export function param(context: any) {
         // request.param care.
         if (!context._requestParamSources) context._requestParamSources = {};
         context._requestParamSources[name] = source;
+
+        if (!context._requestParamShapes) context._requestParamShapes = {};
+        context._requestParamShapes[name] = tupleArity === undefined
+            ? { kind: 'scalar' }
+            : { kind: 'tuple', arity: tupleArity };
 
         return [val, name];
     };

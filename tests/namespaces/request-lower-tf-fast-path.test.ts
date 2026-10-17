@@ -228,16 +228,19 @@ plot(ltf.size(), "sz")
     });
 
     it('falls back to the slow path when a UDT has any non-builtin default', async () => {
-        // The type has 5 builtin defaults + 1 user-derived default
-        // (`extra = ta.sma(close, 3)`). The detector must reject the
-        // whole UDT and use the slow path.
+        // The type has 1 candle builtin default + 1 qualified constant
+        // default (`c = color.red`). The constant default compiles (it is
+        // not a function call or calculation) but it is not a candle
+        // builtin, so the runtime detector must reject the whole UDT and
+        // use the slow path. (A function-call default such as
+        // `ta.sma(close, 3)` is now a compile error CE10133.)
         const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, chartStart, chartEnd);
         const code = `
 //@version=5
 indicator("udt-mixed")
 type candle
     float o = open
-    float extra = ta.sma(close, 3)
+    color c = color.red
 mycandle = candle.new()
 ltf = request.security_lower_tf(syminfo.tickerid, "D", mycandle)
 plot(ltf.size(), "sz")

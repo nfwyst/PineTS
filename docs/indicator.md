@@ -35,7 +35,7 @@ Every code snippet on this page is exercised by the verification harness at `Pin
 The simplest path — wrap a Pine string in `new Indicator(...)`, pass it to `pine.run()`:
 
 ```javascript
-const { PineTS, Indicator } = require('pinets');
+const { PineTS, Indicator } = require('@nfwyst/pinets');
 
 const code = `
 //@version=6
@@ -424,7 +424,7 @@ new Indicator(`//@version=6\nplot(close)`).getDeclarationType(); // → null  (f
 The complete prop schemas are also exported as top-level constants. UI code that wants the full list (independent of any Indicator instance) can import them directly:
 
 ```javascript
-const { INDICATOR_PROPS, STRATEGY_PROPS, propsForDeclaration } = require('pinets');
+const { INDICATOR_PROPS, STRATEGY_PROPS, propsForDeclaration } = require('@nfwyst/pinets');
 
 INDICATOR_PROPS; // IPineProp[]   — 17 entries (incl. title/shorttitle)
 STRATEGY_PROPS; // IPineProp[]   — 33 entries
@@ -432,7 +432,7 @@ propsForDeclaration('strategy'); // → STRATEGY_PROPS
 propsForDeclaration(null); // → INDICATOR_PROPS (fallback)
 ```
 
-Every enum-typed entry in [`propsSchema.ts`](https://github.com/LuxAlgo/PineTS/blob/main/src/Indicator/propsSchema.ts) has a one-line comment enumerating accepted values and pointing to the corresponding exported Pine enum (`enum format`, `enum scale`, `enum currency`, …) in [`src/namespaces/Types.ts`](https://github.com/LuxAlgo/PineTS/blob/main/src/namespaces/Types.ts) so you can import the source-of-truth values rather than hard-coding strings in UI code.
+Every enum-typed entry in [`propsSchema.ts`](https://github.com/nfwyst/PineTS/blob/main/src/Indicator/propsSchema.ts) has a one-line comment enumerating accepted values and pointing to the corresponding exported Pine enum (`enum format`, `enum scale`, `enum currency`, …) in [`src/namespaces/Types.ts`](https://github.com/nfwyst/PineTS/blob/main/src/namespaces/Types.ts) so you can import the source-of-truth values rather than hard-coding strings in UI code.
 
 ---
 

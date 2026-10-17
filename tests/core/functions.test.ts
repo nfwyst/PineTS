@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PineTS, Provider } from 'index';
+import { normalizePlotString } from '../utils';
 
 describe('Functions', () => {
     it('PVT Function', async () => {
@@ -57,7 +58,7 @@ describe('Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('WAD Function', async () => {
@@ -118,7 +119,7 @@ describe('Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('NVI Function', async () => {
@@ -182,7 +183,7 @@ describe('Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('MFI using pine function', async () => {
@@ -244,7 +245,7 @@ describe('Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('CMO Function', async () => {
@@ -297,7 +298,7 @@ describe('Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('COG Function', async () => {
@@ -353,7 +354,7 @@ describe('Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('SUPERTREND Function', async () => {
@@ -432,7 +433,7 @@ describe('Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
     it('SAR Function', async () => {
         const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, new Date('2018-12-10').getTime(), new Date('2020-01-27').getTime());
@@ -554,7 +555,7 @@ describe('Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('Tuple Return with Complex Expressions (Bollinger-like Bands)', async () => {
@@ -635,7 +636,7 @@ describe('Functions', () => {
 [2019-08-19T00:00:00.000-00:00]: 8846.2 13103.3070605096 4589.092939490401
 [2019-08-26T00:00:00.000-00:00]: 9076.0505 12995.5919186738 5156.5090813261995`;
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('Nested UDT Field Assignment and Read', async () => {

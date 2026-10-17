@@ -3,7 +3,22 @@
 
 import * as walk from 'acorn-walk';
 import ScopeManager from './ScopeManager';
+import { VARIP_DECLARATION_LABEL } from '../markers';
 import { CONTEXT_NAME } from '../utils/ASTFactory';
+
+export function preProcessVaripDeclarations(ast: any): void {
+    walk.simple(ast, {
+        LabeledStatement(node: any) {
+            const declaration = node.body;
+            if (node.label?.name !== VARIP_DECLARATION_LABEL) return;
+            if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'var') return;
+
+            delete node.label;
+            delete node.body;
+            Object.assign(node, declaration, { kind: 'varip' });
+        },
+    });
+}
 
 export function transformNestedArrowFunctions(ast: any): void {
     walk.recursive(ast, null, {

@@ -3,6 +3,7 @@
 
 import { Order, StrategyState, Trade } from './types';
 import { Series } from '../../Series';
+import { parseTimeframe, timeframeSeconds } from '../../timeframe';
 
 /**
  * Parse strategy() function arguments
@@ -320,11 +321,11 @@ export function processStrategyOrders(context: any): void {
                     if (direction === 1 && lowPrice <= order.limit - limitSlack) {
                         // Long limit order - buy when price drops to limit
                         shouldFill = true;
-                        fillPrice = order.limit;
+                        fillPrice = Math.min(openPrice, order.limit);
                     } else if (direction === -1 && highPrice >= order.limit + limitSlack) {
                         // Short limit order - sell when price rises to limit
                         shouldFill = true;
-                        fillPrice = order.limit;
+                        fillPrice = Math.max(openPrice, order.limit);
                     }
                 }
                 break;
@@ -388,6 +389,14 @@ export function processStrategyOrders(context: any): void {
  */
 function fillEntryOrder(context: any, order: Order, fillPrice: number, currentTime: number, markPrice: number): void {
     const strategy: StrategyState = context.strategy;
+    const direction = parseDirection(order.direction);
+    const baseQty = Reflect.get(order, '_base_qty');
+    if (typeof baseQty === 'number' && Number.isFinite(baseQty)) {
+        const currentSize = strategy.position_size;
+        const oppositeQty = currentSize !== 0 && Math.sign(currentSize) !== direction ? Math.abs(currentSize) : 0;
+        order.qty = baseQty + oppositeQty;
+        order._isReversalEntry = oppositeQty > 0;
+    }
     // Pre-fill risk check: block if any active risk rule violates.
     if (isOrderBlockedByRisk(strategy, order)) {
         order.status = 'cancelled';
@@ -397,7 +406,6 @@ function fillEntryOrder(context: any, order: Order, fillPrice: number, currentTi
     // Apply slippage against the trade direction (longs fill higher,
     // shorts fill lower). slippage is in ticks of syminfo.mintick and
     // applies to market and stop orders only: a limit fills at its price.
-    const direction = parseDirection(order.direction);
     if (order.type === 'market' || order.type === 'stop') fillPrice = applySlippage(context, direction, fillPrice);
 
     // Pre-trade margin check (Pine broker emulator). When the
@@ -454,6 +462,7 @@ function fillEntryOrder(context: any, order: Order, fillPrice: number, currentTi
                     order.fill_price = fillPrice;
                     order.fill_bar = context.idx;
                     order.fill_time = currentTime;
+                    recordFilledStrategyOrder(context, fillPrice, currentTime);
                 } else {
                     order.status = 'cancelled';
                 }
@@ -468,6 +477,7 @@ function fillEntryOrder(context: any, order: Order, fillPrice: number, currentTi
     order.fill_price = fillPrice;
     order.fill_bar = context.idx;
     order.fill_time = currentTime;
+    recordFilledStrategyOrder(context, fillPrice, currentTime);
 }
 
 /**
@@ -514,6 +524,7 @@ export function processOrdersOnClose(context: any): void {
             order.fill_price = fillPrice;
             order.fill_bar = context.idx;
             order.fill_time = currentTime;
+            recordFilledStrategyOrder(context, fillPrice, currentTime);
         } else if (onClose && (order.category ?? 'entry') === 'entry' && order.type === 'market') {
             markToMarket(context, closePrice);
             fillEntryOrder(context, order, closePrice, currentTime, closePrice);
@@ -618,7 +629,7 @@ export function wouldExceedPyramiding(strategy: StrategyState, direction: number
  *   - max_position_size: post-fill |position_size| would exceed N
  */
 export function isOrderBlockedByRisk(strategy: StrategyState, order: Order): boolean {
-    if (strategy.risk_halted) return true;
+    if (strategy.risk_halted || strategy.risk_intraday_halted) return true;
     const rules = strategy.risk_rules;
     const orderDir = order.direction;
 
@@ -633,47 +644,115 @@ export function isOrderBlockedByRisk(strategy: StrategyState, order: Order): boo
     return false;
 }
 
-/**
- * Latches `risk_halted` when any catastrophic rule trips (max_drawdown,
- * max_intraday_loss, max_cons_loss_days). Once halted, all entries are
- * blocked for the rest of the run.
- *
- * Called after each close. The intraday rules use simple cumulative
- * approximations — true day-rollover detection would require bar timestamp
- * + timezone logic that's deferred.
- */
-export function evaluateCatastrophicRiskHalt(strategy: StrategyState): void {
-    if (strategy.risk_halted) return;
-    const rules = strategy.risk_rules;
+function riskPeriodKey(context: any): number {
+    const timeframe = parseTimeframe(context.timeframe);
+    if (timeframe && timeframeSeconds(timeframe) > 86_400) return context.idx;
+    const tradingDay = Number(context.pine.time_tradingday);
+    return Number.isFinite(tradingDay) ? tradingDay : context.idx;
+}
 
-    if (rules.max_drawdown) {
-        const limit =
-            rules.max_drawdown.type === 'percent_of_equity' ? (rules.max_drawdown.value / 100) * strategy.equity_peak : rules.max_drawdown.value;
+function riskPrice(context: any): number {
+    return Series.from(context.data.close).get(0);
+}
+
+function riskTime(context: any): number {
+    return Series.from(context.data.openTime).get(0);
+}
+
+function haltStrategyForRisk(context: any, permanent: boolean, price: number, time: number): void {
+    const strategy: StrategyState = context.strategy;
+    if (permanent) strategy.risk_halted = true;
+    else strategy.risk_intraday_halted = true;
+
+    for (const order of strategy.pending_orders) {
+        if (order.status === 'pending') order.status = 'cancelled';
+    }
+    strategy.pending_orders = [];
+
+    if (strategy.position_size !== 0) {
+        closePartialPosition(context, Math.abs(strategy.position_size), price, time, {
+            exitId: 'Risk management',
+            exitComment: 'Risk management',
+        });
+    }
+    markToMarket(context, price);
+    updateStrategyMetrics(context);
+}
+
+/** Advance day-scoped risk state before pending orders are processed. */
+export function prepareStrategyRiskPeriod(context: any): void {
+    const strategy: StrategyState | undefined = context.strategy;
+    if (!strategy) return;
+    const key = riskPeriodKey(context);
+
+    if (strategy._risk_period_key === undefined) {
+        strategy._risk_period_key = key;
+        strategy._risk_period_start_netprofit = strategy.netprofit;
+        strategy._risk_period_max_equity = strategy.equity;
+        return;
+    }
+    if (strategy._risk_period_key === key) return;
+
+    const periodProfit = strategy.netprofit - strategy._risk_period_start_netprofit;
+    strategy._risk_consecutive_loss_days = periodProfit < 0 ? strategy._risk_consecutive_loss_days + 1 : 0;
+    const consecutiveRule = strategy.risk_rules.max_cons_loss_days;
+    if (consecutiveRule && strategy._risk_consecutive_loss_days >= consecutiveRule.count) {
+        strategy.risk_halted = true;
+    }
+
+    strategy._risk_period_key = key;
+    strategy._risk_period_start_netprofit = strategy.netprofit;
+    strategy._risk_period_max_equity = strategy.equity;
+    strategy._risk_period_filled_orders = 0;
+    strategy.risk_intraday_halted = false;
+
+    if (strategy.risk_halted) {
+        haltStrategyForRisk(context, true, Series.from(context.data.open).get(0), riskTime(context));
+    }
+}
+
+function recordFilledStrategyOrder(context: any, fillPrice: number, fillTime: number): void {
+    prepareStrategyRiskPeriod(context);
+    const strategy: StrategyState = context.strategy;
+    strategy._risk_period_filled_orders++;
+    const rule = strategy.risk_rules.max_intraday_filled_orders;
+    if (rule && strategy._risk_period_filled_orders >= rule.count) {
+        haltStrategyForRisk(context, false, fillPrice, fillTime);
+    }
+}
+
+/** Evaluate equity-based rules after a bar or on-close fill settles. */
+export function evaluateStrategyRisk(context: any): void {
+    const strategy: StrategyState | undefined = context.strategy;
+    if (!strategy) return;
+    prepareStrategyRiskPeriod(context);
+
+    if (strategy.risk_halted || strategy.risk_intraday_halted) {
+        haltStrategyForRisk(context, strategy.risk_halted, riskPrice(context), riskTime(context));
+        return;
+    }
+
+    const drawdownRule = strategy.risk_rules.max_drawdown;
+    if (drawdownRule) {
+        const limit = drawdownRule.type === 'percent_of_equity'
+            ? (drawdownRule.value / 100) * strategy.equity_peak
+            : drawdownRule.value;
         if (strategy.max_drawdown >= limit) {
-            strategy.risk_halted = true;
+            haltStrategyForRisk(context, true, riskPrice(context), riskTime(context));
             return;
         }
     }
-    if (rules.max_intraday_loss) {
-        const limit =
-            rules.max_intraday_loss.type === 'percent_of_equity'
-                ? (rules.max_intraday_loss.value / 100) * strategy.initial_capital
-                : rules.max_intraday_loss.value;
-        if (strategy.grossloss >= limit) {
-            strategy.risk_halted = true;
-            return;
-        }
-    }
-    if (rules.max_cons_loss_days) {
-        let consecutive = 0;
-        for (let i = strategy.closedtrades.length - 1; i >= 0; i--) {
-            if ((strategy.closedtrades[i].profit ?? 0) < 0) consecutive++;
-            else break;
-        }
-        if (consecutive >= rules.max_cons_loss_days.count) {
-            strategy.risk_halted = true;
-        }
-    }
+
+    strategy._risk_period_max_equity = Math.max(strategy._risk_period_max_equity, strategy.equity);
+    const intradayRule = strategy.risk_rules.max_intraday_loss;
+    if (!intradayRule) return;
+    const limit = intradayRule.type === 'percent_of_equity'
+        ? (intradayRule.value / 100) * strategy._risk_period_max_equity
+        : intradayRule.value;
+    if (strategy._risk_period_max_equity - strategy.equity < limit) return;
+
+    const permanent = intradayRule.type === 'percent_of_equity' && strategy.equity <= 0;
+    haltStrategyForRisk(context, permanent, riskPrice(context), riskTime(context));
 }
 
 /**
@@ -882,12 +961,8 @@ function executeOrder(context: any, order: Order, fillPrice: number, fillTime: n
         });
 
         // If there is remaining quantity (reversal), open a new trade.
-        // When the close leg consumed LESS than the order anticipated at
-        // queue time (a deferred close-margin-call shrank the position
-        // between queue and fill), the remaining qty exceeds the ordered
-        // base size. TV books the intended base size and the overshoot as
-        // TWO separate lots (each with its own exit bracket and ledger
-        // row — xlsx 2021-10-02: longs 5 + 0.263108 at the same fill).
+        // Legacy callers can supply a fixed reversal quantity larger than
+        // the stored base size. Preserve its split-lot representation.
         if (remainingQty > 0) {
             const baseQty = (order as any)._base_qty;
             if (baseQty !== undefined && remainingQty > baseQty + 1e-9) {
@@ -1093,9 +1168,6 @@ export function closePartialPosition(context: any, qtyToClose: number, exitPrice
         }
     }
 
-    // Catastrophic risk-rule halt check after this close.
-    evaluateCatastrophicRiskHalt(strategy);
-
     // Update flat position scalars from the (possibly shrunken) open-trade book
     const currentSize = strategy.position_size;
     const sizeReduction = Math.sign(currentSize) * qtyToClose; // Reduce magnitude
@@ -1288,12 +1360,12 @@ function updateEquityPeaks(context: any, highPrice: number, lowPrice: number): v
 }
 
 /**
- * FIFO close of `qtyToClose` contracts from open trades, optionally filtered
- * by `fromEntry` — when set, only trades whose `entry_id === fromEntry` are
- * eligible. Falls back to closing across all open trades when empty/undefined.
+ * Allocate `qtyToClose` contracts according to close_entries_rule. FIFO uses
+ * the global physical order even when an exit names an entry; ANY restricts
+ * allocation to the named/source lot when supplied.
  *
- * Wraps `closePartialPosition` by temporarily reorganizing `opentrades` so
- * the matching trades sit at the head of the FIFO queue.
+ * ANY wraps `closePartialPosition` by temporarily reorganizing `opentrades`
+ * so the matching trades sit at the head of the queue.
  */
 export function closeMatching(
     context: any,
@@ -1305,6 +1377,14 @@ export function closeMatching(
     specificTradeId?: string,
 ): void {
     const strategy: StrategyState = context.strategy;
+
+    // TradingView's default FIFO rule allocates every exit fill against the
+    // oldest physical lots, regardless of the entry id that armed the exit.
+    // The named/source lot only controls allocation when ANY is requested.
+    if ((strategy.config.close_entries_rule ?? 'FIFO') === 'FIFO') {
+        closePartialPosition(context, qtyToClose, exitPrice, exitTime, closeInfo);
+        return;
+    }
 
     // Per-LOT close (exit brackets): TV binds each bracket to the physical
     // entry lot whose entry price computed its level — the fill closes
@@ -1431,10 +1511,8 @@ export function processExitOrders(context: any, phase: 'open' | 'intrabar' = 'in
             order.trail_price === undefined &&
             order.trail_points === undefined
         ) {
-            // Market closes fill in the intrabar phase (after entries) —
-            // their interplay with reversal entries is governed by the
-            // _intended_trade_ids snapshot above.
-            if (phase === 'open') continue;
+            // PineTS runs the open phase before entries. Direct callers that
+            // use the default intrabar phase retain the same market-close path.
             // Skip orders placed on the current bar — they fill on the next bar's open.
             if (order.bar >= context.idx) continue;
 
@@ -1458,6 +1536,7 @@ export function processExitOrders(context: any, phase: 'open' | 'intrabar' = 'in
             order.fill_price = fillPrice;
             order.fill_bar = context.idx;
             order.fill_time = currentTime;
+            recordFilledStrategyOrder(context, fillPrice, currentTime);
             continue;
         }
 
@@ -1842,6 +1921,7 @@ export function processExitOrders(context: any, phase: 'open' | 'intrabar' = 'in
                 order.fill_price = lastFill;
                 order.fill_bar = context.idx;
                 order.fill_time = currentTime;
+                recordFilledStrategyOrder(context, lastFill, currentTime);
             }
             // Trades this order reduced: it (and a later call with its id) no longer applies to them.
             for (const [t, before] of sizesBefore) {
@@ -1872,11 +1952,8 @@ export function processExitOrders(context: any, phase: 'open' | 'intrabar' = 'in
  * processMarginCall). TV books that fill at the PREVIOUS bar's close,
  * AFTER the script's on-close evaluation — so the script and any order
  * it queued saw the pre-MC#2 position. PineTS mirrors this by booking
- * the fill at the very start of the NEXT bar, before entries process:
- * a reversal queued at the MC bar's close (qty frozen at queue time)
- * then naturally overshoots by exactly q2, reproducing TV's phantom
- * opposite-side position (xlsx-confirmed: 2021-10-02 reversal long
- * 5.263108 = 5 + 0.263108).
+ * the fill at the very start of the NEXT bar, before exits and entries;
+ * fill-time reversal sizing then uses the position left by that event.
  *
  * Same-direction (non-reversal) entries queued on the MC bar are
  * CANCELED — TV's transient post-MC state rejects them (2022-04-19: the
@@ -2037,10 +2114,8 @@ export function processMarginCall(context: any, checkpoint: 'open' | 'extreme' |
         // call q2 = min(remaining, 4·trunc6(D2/(p·m·pv))) fires — FILLED
         // AT THE BAR'S CLOSE and booked AFTER the script's on-close
         // evaluation, so the script (and any order it queues this bar)
-        // still sees the pre-MC#2 position. A reversal queued at that
-        // close therefore overshoots by exactly q2 on the next bar (TV
-        // xlsx 2021-10-02: reversal long 5.263108 = 5 + q2). Application
-        // is deferred to the start of the next bar via
+        // still sees the pre-MC#2 position. Application is deferred to the
+        // start of the next bar via
         // `_pending_close_mc` (see applyPendingCloseMarginCall).
         //
         // Single-piece margin calls can never fire this (D2 < 0
@@ -2300,6 +2375,7 @@ export function initializeStrategy(context: any, config: any): void {
         slippage: 0,
         commission_type: 'percent',
         commission_value: 0,
+        close_entries_rule: 'FIFO',
         margin_long: 100,
         margin_short: 100,
         explicit_plot_zorder: false,
@@ -2378,6 +2454,11 @@ export function initializeStrategy(context: any, config: any): void {
         // Risk-management rules (configured via strategy.risk.*)
         risk_rules: {},
         risk_halted: false,
+        risk_intraday_halted: false,
+        _risk_period_start_netprofit: 0,
+        _risk_period_max_equity: initialCapital,
+        _risk_period_filled_orders: 0,
+        _risk_consecutive_loss_days: 0,
 
         // Cadence tracking for strategy.exit (see types.ts).
         _exit_call_history: new Map<string, number>(),

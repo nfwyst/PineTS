@@ -4,7 +4,7 @@ import { Series } from '../Series';
 import { parseArgsForPineParams } from './utils';
 import { parseSessionSpec, isInSessionSpec } from './sessionSpec';
 import { PineRuntimeError } from '../errors/PineRuntimeError';
-import { canonicalTimeframe, parseTimeframe, timeframeBarStart } from '../timeframe';
+import { canonicalTimeframe, parseTimeframe, shiftTimeframeBar, timeframeBarRange } from '../timeframe';
 
 // Current values of the arguments; named arguments arrive as a trailing plain object
 // whose values may be series too (`time(tf, session = sessionInput)`).
@@ -153,6 +153,13 @@ const TIME_ARGS_TYPES = {
     timeframe_bars_back: 'number',
 };
 
+function timeOffset(value: unknown): number | null {
+    const offset = Number(value ?? 0);
+    if (!Number.isFinite(offset)) return null;
+    const normalized = Math.trunc(offset);
+    return normalized >= -500 && normalized <= 5000 ? normalized : null;
+}
+
 /**
  * TimeHelper implements the dual-use `time` / `time_close` identifiers.
  * - Bare `time` → `time.__value` → openTime Series
@@ -180,29 +187,53 @@ export class TimeHelper {
         const unwrapped = unwrapTimeArgs(args);
         const parsed = parseArgsForPineParams<any>(unwrapped, TIME_SIGNATURES, TIME_ARGS_TYPES);
 
-        const barsBack = parsed.bars_back ?? 0;
+        const barsBack = timeOffset(parsed.bars_back);
+        const timeframeBarsBack = timeOffset(parsed.timeframe_bars_back);
+        if (barsBack === null || timeframeBarsBack === null) return NaN;
         const timeframe = parsed.timeframe || '';
 
-        // Get the current bar's timestamp (with bars_back offset on the chart TF)
-        const timeSeries = this.context.data[this.dataField];
-        const currentTime = Series.from(timeSeries).get(barsBack);
-        if (isNaN(currentTime) || currentTime == null) return NaN;
-
-        // If timeframe is empty or matches the chart timeframe, return the bar's own time
-        let htfBarTime: number;
-        if (!timeframe || canonicalTimeframe(timeframe) === canonicalTimeframe(this.context.timeframe)) {
-            htfBarTime = currentTime;
+        const chart = parseTimeframe(this.context.timeframe);
+        const openSeries = Series.from(this.context.data.openTime);
+        const closeSeries = Series.from(this.context.data.closeTime);
+        let chartOpen: number;
+        let chartClose: number;
+        if (barsBack >= 0) {
+            chartOpen = openSeries.get(barsBack);
+            chartClose = closeSeries.get(barsBack);
         } else {
-            const tf = parseTimeframe(timeframe);
-            if (!tf) throw new PineRuntimeError(`Cannot parse resolution '${timeframe}'. - Invalid format`, 'time');
-            // Open time of the bar of `timeframe` that contains this bar
-            htfBarTime = timeframeBarStart(currentTime, tf);
+            if (!chart) return NaN;
+            const future = shiftTimeframeBar(openSeries.get(0), chart, -barsBack, this.context.sessionGrid);
+            if (!future) return NaN;
+            chartOpen = future.start;
+            chartClose = future.end;
         }
+        if (!Number.isFinite(chartOpen) || !Number.isFinite(chartClose)) return NaN;
+
+        const sameTimeframe = !timeframe || canonicalTimeframe(timeframe) === canonicalTimeframe(this.context.timeframe);
+        const target = sameTimeframe ? chart : parseTimeframe(timeframe);
+        if (!target && (!sameTimeframe || this.context.timeframe)) {
+            throw new PineRuntimeError(`Cannot parse resolution '${timeframe}'. - Invalid format`, 'time');
+        }
+
+        // Array sources may omit timeframe metadata while still supplying exact chart timestamps.
+        let targetBar = target
+            ? timeframeBarRange(chartOpen, target, this.context.sessionGrid)
+            : { start: chartOpen, end: chartClose };
+        if (!targetBar) return NaN;
+        if (timeframeBarsBack !== 0) {
+            if (!target) return NaN;
+            targetBar = shiftTimeframeBar(targetBar.start, target, -timeframeBarsBack, this.context.sessionGrid);
+            if (!targetBar) return NaN;
+        }
+
+        const htfBarTime = sameTimeframe && timeframeBarsBack === 0
+            ? (this.dataField === 'closeTime' ? chartClose : chartOpen)
+            : (this.dataField === 'closeTime' ? targetBar.end : targetBar.start);
 
         // Session filtering
         if (parsed.session !== undefined && parsed.session !== '') {
             const timezone = parsed.timezone || this.context.pine?.syminfo?.timezone || 'UTC';
-            return this._isInSession(htfBarTime, parsed.session, timezone) ? htfBarTime : NaN;
+            return this._isInSession(targetBar.start, parsed.session, timezone) ? htfBarTime : NaN;
         }
 
         return htfBarTime;

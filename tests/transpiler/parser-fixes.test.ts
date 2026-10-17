@@ -1665,7 +1665,7 @@ plot(0)
     });
 
     it('should run request.security in user function with Binance provider', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', '1W', 50, new Date('2024-01-01').getTime());
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', '1W', 50, new Date('2024-01-01').getTime());
         const code = `
 //@version=6
 indicator("Async Runtime", overlay=true)

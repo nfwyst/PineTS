@@ -11,7 +11,7 @@ permalink: /architecture/runtime/context/
 The `Context` is the central object (usually named `$`) passed to the transpiled function. It acts as the container for:
 
 1.  **Market Data**: `$.data.open`, `$.data.close`, etc.
-2.  **User Variables**: `$.let`, `$.const`, `$.var`.
+2.  **User Variables**: `$.let`, `$.const`, `$.var`, `$.varip`.
 3.  **Function State**: `$.taState`, `$.params`.
 4.  **Namespaces**: `$.ta`, `$.math`, `$.request`, `$.pine`.
 
@@ -36,5 +36,5 @@ PineTS uses specific accessors to handle Pine Script indexing semantics.
 
 ## Precision
 
-All numeric outputs are routed through `context.precision()` to enforce consistent decimal rounding (default 10 places), matching Pine Script behavior.
+Numeric outputs pass through `context.precision()`. Without an explicit decimal count it preserves Pine's internal float precision; only APIs whose contract requires decimal rounding pass a count.
 

@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { Provider } from '../../src/marketData/Provider.class';
 
 describe('BinanceProvider.getSymbolInfo', () => {
-    const binance = Provider.Binance;
+    const binance = Provider.Mock;
 
     describe('Spot Market Symbols', () => {
         it('should return correct symbol info for BTCUSDT', async () => {

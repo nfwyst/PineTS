@@ -16,7 +16,7 @@ async function generateIndex() {
         // Read getters directory (if it exists)
         let getters = [];
         try {
-            const getterFiles = await readdir(gettersDir);
+            const getterFiles = (await readdir(gettersDir)).sort();
             getters = getterFiles.filter((f) => f.endsWith('.ts') && f !== 'matrix.index.ts' && f !== 'index.ts').map((f) => f.replace('.ts', ''));
         } catch (error) {
             // Getters directory doesn't exist, that's fine
@@ -24,7 +24,7 @@ async function generateIndex() {
         }
 
         // Read methods directory
-        const methodFiles = await readdir(methodsDir);
+        const methodFiles = (await readdir(methodsDir)).sort();
         const methods = methodFiles
             .filter((f) => f.endsWith('.ts'))
             .map((f) => {
@@ -38,29 +38,20 @@ async function generateIndex() {
         // --- Generate PineMatrixObject.ts ---
         const objectMethods = methods.filter((m) => !staticMethods.includes(m.classProp));
 
-        const objectImports = objectMethods.map((m) => `import { ${m.export} as ${m.export}_factory } from './methods/${m.file}';`).join('\n');
-
-        const objectPrivateProps = objectMethods.map((m) => `    private _${m.classProp}: any;`).join('\n');
-
-        const objectInitProps = objectMethods.map((m) => `        this._${m.classProp} = ${m.export}_factory(this.context);`).join('\n');
-
         const objectMethodDefs = objectMethods
             .map((m) => {
                 return `    ${m.classProp}(...args: any[]) {
-        return this._${m.classProp}(this, ...args);
+        return this.context.pine.matrix.${m.classProp}(this, ...args);
     }`;
             })
             .join('\n\n');
 
         const objectClassCode = `// SPDX-License-Identifier: AGPL-3.0-only
 // This file is auto-generated. Do not edit manually.
-// Run: npm run generate:matrix-index
-
-${objectImports}
+// Run: bun run generate:matrix-index
 
 export class PineMatrixObject {
     public matrix: any[][];
-${objectPrivateProps}
 
     constructor(
         rows: number = 0,
@@ -74,7 +65,6 @@ ${objectPrivateProps}
                 this.matrix.push(Array(cols).fill(initialValue));
             }
         }
-${objectInitProps}
     }
 
     toString(): string {
@@ -100,13 +90,11 @@ ${objectMethodDefs}
         // Imports for index file
         let indexImports = `export { PineMatrixObject } from './PineMatrixObject';\n\nimport { PineMatrixObject } from './PineMatrixObject';`;
 
-        // Import static method factories
-        const staticMethodImports = methods
-            .filter((m) => staticMethods.includes(m.classProp))
+        const methodImports = methods
             .map((m) => `import { ${m.export} } from './methods/${m.file}';`)
             .join('\n');
 
-        indexImports += '\n' + staticMethodImports;
+        indexImports += '\n' + methodImports;
 
         // Generate getters object (for type definitions mostly, or we just inline)
         const getterInstall =
@@ -125,12 +113,7 @@ ${getters.map((g) => `      ${g}: ${g}`).join(',\n')}
 
         // Generate methods installation
         const methodInstall = methods
-            .map((m) => {
-                if (staticMethods.includes(m.classProp)) {
-                    return `    this.${m.classProp} = ${m.export}(context);`;
-                }
-                return `    this.${m.classProp} = (id: PineMatrixObject, ...args: any[]) => id.${m.classProp}(...args);`;
-            })
+            .map((m) => `    this.${m.classProp} = ${m.export}(context);`)
             .join('\n');
 
         // Type-specific aliases for matrix.new<TYPE>() → matrix.new_TYPE()
@@ -140,7 +123,7 @@ ${getters.map((g) => `      ${g}: ${g}`).join(',\n')}
 
         const classCode = `// SPDX-License-Identifier: AGPL-3.0-only
 // This file is auto-generated. Do not edit manually.
-// Run: npm run generate:matrix-index
+// Run: bun run generate:matrix-index
 
 ${indexImports}
 ${getterImports ? getterImports + '\n' : ''}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrayPrecision, getKlines, runNSFunctionWithArgs } from '../../utils';
+import { arrayPrecision, getKlines, normalizePlotString, runNSFunctionWithArgs } from '../../utils';
 
 import { Context, PineTS, Provider } from 'index';
 
@@ -23,7 +23,7 @@ describe('Technical Analysis - Volatility & Range', () => {
         ];
         console.log(' ATR ', part);
 
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('DEV - Mean Absolute Deviation', async () => {
@@ -35,7 +35,7 @@ describe('Technical Analysis - Volatility & Range', () => {
             215.0546938776,
         ];
         console.log(' DEV ', part);
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('VARIANCE - Variance', async () => {
@@ -47,7 +47,7 @@ describe('Technical Analysis - Volatility & Range', () => {
             61418.426858902, 63840.5915412903, 66543.9050884247,
         ];
         console.log(' VARIANCE ', part);
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('TR - True Range', async () => {
@@ -134,7 +134,7 @@ describe('Technical Analysis - Volatility & Range', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('BB - Bollinger Bands', async () => {
@@ -198,7 +198,7 @@ describe('Technical Analysis - Volatility & Range', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('BBW - Bollinger Bands Width', async () => {
@@ -253,7 +253,7 @@ describe('Technical Analysis - Volatility & Range', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('KC - Keltner Channels useTrueRange = true', async () => {
@@ -310,7 +310,7 @@ describe('Technical Analysis - Volatility & Range', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('KC - Keltner Channels useTrueRange = false', async () => {
@@ -367,7 +367,7 @@ describe('Technical Analysis - Volatility & Range', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('KCW - Keltner Channels Width useTrueRange = true', async () => {
@@ -415,7 +415,7 @@ describe('Technical Analysis - Volatility & Range', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('KCW - Keltner Channels Width useTrueRange = false', async () => {
@@ -463,7 +463,7 @@ describe('Technical Analysis - Volatility & Range', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('RANGE - Range', async () => {
@@ -511,6 +511,6 @@ describe('Technical Analysis - Volatility & Range', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });

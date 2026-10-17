@@ -95,7 +95,7 @@ describe('CHART Namespace', () => {
     });
 
     describe('chart properties', () => {
-        it('chart.bg_color returns a color string (Pine variable — bare member access)', async () => {
+        it('chart.bg_color keeps the exact default dark background', async () => {
             const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'D', null, new Date('2025-01-01').getTime(), new Date('2025-11-20').getTime());
 
             const { result } = await pineTS.run((context) => {
@@ -103,11 +103,10 @@ describe('CHART Namespace', () => {
                 return { bgColor };
             });
 
-            expect(typeof result.bgColor[0]).toBe('string');
-            expect(result.bgColor[0].length).toBeGreaterThan(0);
+            expect(result.bgColor[0]).toBe('#1e293b');
         });
 
-        it('chart.fg_color returns a color string (Pine variable — bare member access)', async () => {
+        it('chart.fg_color keeps the exact default dark foreground', async () => {
             const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'D', null, new Date('2025-01-01').getTime(), new Date('2025-11-20').getTime());
 
             const { result } = await pineTS.run((context) => {
@@ -115,8 +114,85 @@ describe('CHART Namespace', () => {
                 return { fgColor };
             });
 
-            expect(typeof result.fgColor[0]).toBe('string');
-            expect(result.fgColor[0].length).toBeGreaterThan(0);
+            expect(result.fgColor[0]).toBe('#d1d4dc');
+        });
+
+        it('host theme reaches chart variables and plot and drawing consumers', async () => {
+            // Given: one PineTS instance with a validated custom host theme.
+            const background = '#102030';
+            const foreground = '#abcdef';
+            const pineTS = new PineTS(
+                Provider.Mock,
+                'BTCUSDC',
+                'D',
+                null,
+                new Date('2025-01-01').getTime(),
+                new Date('2025-01-05').getTime(),
+                { chartTheme: { background, foreground } },
+            );
+
+            // When: chart variables flow through plot and line color arguments.
+            const context = await pineTS.run(`//@version=6
+indicator("host theme", overlay=true)
+plot(close, "themedPlot", color=chart.fg_color)
+if barstate.isfirst
+    line.new(0, 1, 1, 2, color=chart.bg_color)
+`);
+
+            // Then: the variables and both serialized consumers use the configured values.
+            expect(context.pine.chart.bg_color).toBe(background);
+            expect(context.pine.chart.fg_color).toBe(foreground);
+            expect(context.plots['themedPlot'].data[0].options.color).toBe(foreground);
+            expect(context.plots['__lines__'].data[0].value[0].color).toBe(background);
+        });
+
+        it('keeps host themes isolated per instance without rerunning unrelated scripts', async () => {
+            // Given: two instances with different immutable host themes.
+            const bars = [{ openTime: 0, closeTime: 1, open: 1, high: 2, low: 0, close: 1, volume: 1 }];
+            const source = `//@version=6
+indicator("isolated themes")
+plot(close, "value", color=chart.fg_color)
+`;
+            const first = new PineTS(bars, 'FIRST', 'D', undefined, undefined, undefined, {
+                chartTheme: { background: '#111111', foreground: '#222222' },
+            });
+            const second = new PineTS(bars, 'SECOND', 'D', undefined, undefined, undefined, {
+                chartTheme: { background: '#aaaaaa', foreground: '#bbbbbb' },
+            });
+
+            // When: each instance runs and the first is updated after the second.
+            const firstContext = await first.update(source);
+            const secondContext = await second.update(source);
+            const firstCached = await first.update();
+
+            // Then: values are instance-local and the unrelated theme did not invalidate the first cache.
+            expect(firstContext.pine.chart.bg_color).toBe('#111111');
+            expect(firstContext.pine.chart.fg_color).toBe('#222222');
+            expect(secondContext.pine.chart.bg_color).toBe('#aaaaaa');
+            expect(secondContext.pine.chart.fg_color).toBe('#bbbbbb');
+            expect(firstContext.plots['value'].data[0].options.color).toBe('#222222');
+            expect(secondContext.plots['value'].data[0].options.color).toBe('#bbbbbb');
+            expect(firstCached).toBe(firstContext);
+        });
+
+        it('keeps the host theme inside request.security secondary execution', async () => {
+            const foreground = '#aabbcc';
+            const pineTS = new PineTS(
+                Provider.Mock,
+                'BTCUSDC',
+                '60',
+                undefined,
+                new Date('2024-01-01').getTime(),
+                new Date('2024-01-03').getTime(),
+                { chartTheme: { background: '#010203', foreground } },
+            );
+
+            const context = await pineTS.run(`//@version=6
+indicator("secondary host theme")
+requestedColor = request.security(syminfo.tickerid, "D", chart.fg_color)
+plot(close, "value", color=requestedColor)`);
+
+            expect(context.plots.value.data.at(-1)?.options.color).toBe(foreground);
         });
 
         it('chart.is_standard returns true (Pine variable — bare member access)', async () => {

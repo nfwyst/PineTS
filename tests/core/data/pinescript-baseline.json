@@ -1,0 +1,60 @@
+{
+    "btcUsdt4h": {
+        "provenance": {
+            "symbol": "BTCUSDT",
+            "timeframe": "4h",
+            "requestWindowUtc": "2025-09-20T00:00:00.000Z/2025-09-23T07:59:59.999Z",
+            "acquiredAtUtc": "2026-10-12T17:20:48Z",
+            "oracleSource": "Binance Spot REST API /api/v3/klines",
+            "requestUrl": "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=1758326400000&endTime=1758614399999&limit=20",
+            "rawResponseSha256": "ad777a648d0b8039bc8834157be9751844298bf5eae791566154452469b20584"
+        },
+        "klines": [
+            { "openTime": 1758326400000, "open": 115632.39, "high": 115730.41, "low": 115408.47, "close": 115445, "volume": 717.06298, "closeTime": 1758340799999, "quoteAssetVolume": 82888500.3814652, "numberOfTrades": 124296, "takerBuyBaseAssetVolume": 346.11885, "takerBuyQuoteAssetVolume": 40008333.1499557, "ignore": "0" },
+            { "openTime": 1758340800000, "open": 115445, "high": 115985.2, "low": 115409.08, "close": 115968.56, "volume": 759.46126, "closeTime": 1758355199999, "quoteAssetVolume": 87855071.4537415, "numberOfTrades": 110606, "takerBuyBaseAssetVolume": 467.47497, "takerBuyQuoteAssetVolume": 54074433.5465427, "ignore": "0" },
+            { "openTime": 1758355200000, "open": 115968.56, "high": 115968.57, "low": 115664.11, "close": 115894.06, "volume": 793.04586, "closeTime": 1758369599999, "quoteAssetVolume": 91828050.9108484, "numberOfTrades": 136003, "takerBuyBaseAssetVolume": 360.32496, "takerBuyQuoteAssetVolume": 41724695.4665495, "ignore": "0" },
+            { "openTime": 1758369600000, "open": 115894.05, "high": 116121.81, "low": 115804.47, "close": 115986.69, "volume": 836.91424, "closeTime": 1758383999999, "quoteAssetVolume": 97054572.1350462, "numberOfTrades": 133819, "takerBuyBaseAssetVolume": 365.84809, "takerBuyQuoteAssetVolume": 42427792.072543, "ignore": "0" },
+            { "openTime": 1758384000000, "open": 115986.7, "high": 116079.46, "low": 115698.08, "close": 115702, "volume": 898.20806, "closeTime": 1758398399999, "quoteAssetVolume": 104049061.310618, "numberOfTrades": 121605, "takerBuyBaseAssetVolume": 392.98161, "takerBuyQuoteAssetVolume": 45522079.389769, "ignore": "0" },
+            { "openTime": 1758398400000, "open": 115702, "high": 115944.7, "low": 115603.42, "close": 115685.63, "volume": 670.23512, "closeTime": 1758412799999, "quoteAssetVolume": 77589017.0499701, "numberOfTrades": 114122, "takerBuyBaseAssetVolume": 343.41635, "takerBuyQuoteAssetVolume": 39754136.2178989, "ignore": "0" },
+            { "openTime": 1758412800000, "open": 115685.63, "high": 115732.94, "low": 115441.83, "close": 115669.41, "volume": 919.05922, "closeTime": 1758427199999, "quoteAssetVolume": 106244847.8682677, "numberOfTrades": 138632, "takerBuyBaseAssetVolume": 382.21256, "takerBuyQuoteAssetVolume": 44187619.1962715, "ignore": "0" },
+            { "openTime": 1758427200000, "open": 115669.42, "high": 115815.98, "low": 115487.56, "close": 115815.97, "volume": 806.9398, "closeTime": 1758441599999, "quoteAssetVolume": 93317224.3588633, "numberOfTrades": 135618, "takerBuyBaseAssetVolume": 396.77304, "takerBuyQuoteAssetVolume": 45885341.450196, "ignore": "0" },
+            { "openTime": 1758441600000, "open": 115815.98, "high": 115819.06, "low": 115329.03, "close": 115603.45, "volume": 786.85295, "closeTime": 1758455999999, "quoteAssetVolume": 90947602.1052275, "numberOfTrades": 168670, "takerBuyBaseAssetVolume": 343.18454, "takerBuyQuoteAssetVolume": 39664581.1150844, "ignore": "0" },
+            { "openTime": 1758456000000, "open": 115603.45, "high": 115747.23, "low": 115473.19, "close": 115531.61, "volume": 671.3204, "closeTime": 1758470399999, "quoteAssetVolume": 77628802.4163973, "numberOfTrades": 148679, "takerBuyBaseAssetVolume": 286.47799, "takerBuyQuoteAssetVolume": 33124406.7998765, "ignore": "0" },
+            { "openTime": 1758470400000, "open": 115531.62, "high": 115665.52, "low": 115209.02, "close": 115480.05, "volume": 781.11646, "closeTime": 1758484799999, "quoteAssetVolume": 90162089.9308431, "numberOfTrades": 192628, "takerBuyBaseAssetVolume": 363.97115, "takerBuyQuoteAssetVolume": 42014901.1131198, "ignore": "0" },
+            { "openTime": 1758484800000, "open": 115480.05, "high": 115545.43, "low": 115188, "close": 115232.29, "volume": 546.23336, "closeTime": 1758499199999, "quoteAssetVolume": 62999184.4708107, "numberOfTrades": 161738, "takerBuyBaseAssetVolume": 244.10561, "takerBuyQuoteAssetVolume": 28154689.0724449, "ignore": "0" },
+            { "openTime": 1758499200000, "open": 115232.29, "high": 115379.25, "low": 114150, "close": 114649.89, "volume": 3078.59053, "closeTime": 1758513599999, "quoteAssetVolume": 352684754.1177771, "numberOfTrades": 736906, "takerBuyBaseAssetVolume": 1425.26822, "takerBuyQuoteAssetVolume": 163246716.8960317, "ignore": "0" },
+            { "openTime": 1758513600000, "open": 114649.89, "high": 114649.9, "low": 111800, "close": 112519.99, "volume": 7290.80289, "closeTime": 1758527999999, "quoteAssetVolume": 823530281.5120068, "numberOfTrades": 728222, "takerBuyBaseAssetVolume": 3253.3851, "takerBuyQuoteAssetVolume": 367502330.8616385, "ignore": "0" },
+            { "openTime": 1758528000000, "open": 112520, "high": 112976.02, "low": 112173.52, "close": 112876.97, "volume": 3052.23045, "closeTime": 1758542399999, "quoteAssetVolume": 343444834.8209412, "numberOfTrades": 432429, "takerBuyBaseAssetVolume": 1529.16275, "takerBuyQuoteAssetVolume": 172070503.3334666, "ignore": "0" },
+            { "openTime": 1758542400000, "open": 112876.97, "high": 113432.76, "low": 112380, "close": 112815.5, "volume": 3313.50245, "closeTime": 1758556799999, "quoteAssetVolume": 374108351.0311305, "numberOfTrades": 540240, "takerBuyBaseAssetVolume": 1462.92194, "takerBuyQuoteAssetVolume": 165183779.0093388, "ignore": "0" },
+            { "openTime": 1758556800000, "open": 112815.5, "high": 112888, "low": 111936.4, "close": 112122.9, "volume": 2731.51753, "closeTime": 1758571199999, "quoteAssetVolume": 307062428.9179976, "numberOfTrades": 394676, "takerBuyBaseAssetVolume": 1008.47504, "takerBuyQuoteAssetVolume": 113372531.3751473, "ignore": "0" },
+            { "openTime": 1758571200000, "open": 112122.9, "high": 112977.41, "low": 111975.28, "close": 112650.99, "volume": 1315.06971, "closeTime": 1758585599999, "quoteAssetVolume": 148041861.2990219, "numberOfTrades": 213403, "takerBuyBaseAssetVolume": 633.14472, "takerBuyQuoteAssetVolume": 71308405.4225647, "ignore": "0" },
+            { "openTime": 1758585600000, "open": 112650.99, "high": 112833.09, "low": 111478, "close": 112339.99, "volume": 2398.09582, "closeTime": 1758599999999, "quoteAssetVolume": 269043870.0410974, "numberOfTrades": 423585, "takerBuyBaseAssetVolume": 1029.92621, "takerBuyQuoteAssetVolume": 115566420.2778815, "ignore": "0" },
+            { "openTime": 1758600000000, "open": 112339.99, "high": 113114.01, "low": 111876.15, "close": 113090.13, "volume": 2504.81638, "closeTime": 1758614399999, "quoteAssetVolume": 282369160.4617041, "numberOfTrades": 475088, "takerBuyBaseAssetVolume": 1192.47496, "takerBuyQuoteAssetVolume": 134434490.335274, "ignore": "0" }
+        ]
+    },
+    "btcUsdc1w": {
+        "provenance": {
+            "symbol": "BTCUSDC",
+            "timeframe": "1w",
+            "requestWindowUtc": "2018-12-10T00:00:00.000Z/2019-02-20T00:00:00.000Z",
+            "returnedWindowUtc": "2018-12-10T00:00:00.000Z/2019-02-24T23:59:59.999Z",
+            "acquiredAtUtc": "2026-10-12T17:20:48Z",
+            "oracleSource": "Binance Spot REST API /api/v3/klines",
+            "requestUrl": "https://api.binance.com/api/v3/klines?symbol=BTCUSDC&interval=1w&startTime=1544400000000&endTime=1550620800000&limit=11",
+            "rawResponseSha256": "899285b636d8a038cf8052119c31bfccc2b9d4c1edb9a5e4a687537452313302"
+        },
+        "klines": [
+            { "openTime": 1544400000000, "open": 3200, "high": 3312.32, "low": 3000, "close": 3199.27, "volume": 706.262388, "closeTime": 1545004799999, "quoteAssetVolume": 2258930.03335719, "numberOfTrades": 2556, "takerBuyBaseAssetVolume": 355.339087, "takerBuyQuoteAssetVolume": 1138212.16306901, "ignore": "0" },
+            { "openTime": 1545004800000, "open": 3192.69, "high": 4170, "low": 3187.25, "close": 3953.49, "volume": 10563.102248, "closeTime": 1545609599999, "quoteAssetVolume": 40120147.63977872, "numberOfTrades": 58627, "takerBuyBaseAssetVolume": 4962.67751, "takerBuyQuoteAssetVolume": 18842631.70633415, "ignore": "0" },
+            { "openTime": 1545609600000, "open": 3948.01, "high": 4299, "low": 3528, "close": 3821.66, "volume": 7191.454911, "closeTime": 1546214399999, "quoteAssetVolume": 27497797.57164146, "numberOfTrades": 53897, "takerBuyBaseAssetVolume": 3357.653877, "takerBuyQuoteAssetVolume": 12896941.7023358, "ignore": "0" },
+            { "openTime": 1546214400000, "open": 3832.27, "high": 4080, "low": 3623.24, "close": 4039.13, "volume": 6280.031696, "closeTime": 1546819199999, "quoteAssetVolume": 23974431.343719, "numberOfTrades": 42821, "takerBuyBaseAssetVolume": 3130.895511, "takerBuyQuoteAssetVolume": 11958212.39211301, "ignore": "0" },
+            { "openTime": 1546819200000, "open": 4039, "high": 4110.5, "low": 3431.15, "close": 3509.21, "volume": 12925.321292, "closeTime": 1547423999999, "quoteAssetVolume": 49342653.39535769, "numberOfTrades": 77722, "takerBuyBaseAssetVolume": 6219.868115, "takerBuyQuoteAssetVolume": 23844073.29209199, "ignore": "0" },
+            { "openTime": 1547424000000, "open": 3511.94, "high": 3748, "low": 3477.82, "close": 3535.79, "volume": 9953.713009, "closeTime": 1548028799999, "quoteAssetVolume": 35992664.47664896, "numberOfTrades": 55152, "takerBuyBaseAssetVolume": 2480.448866, "takerBuyQuoteAssetVolume": 8979929.51329784, "ignore": "0" },
+            { "openTime": 1548028800000, "open": 3535.89, "high": 3660.86, "low": 3436.59, "close": 3531.36, "volume": 7195.579073, "closeTime": 1548633599999, "quoteAssetVolume": 25584871.42807328, "numberOfTrades": 66361, "takerBuyBaseAssetVolume": 2607.555002, "takerBuyQuoteAssetVolume": 9264942.12778253, "ignore": "0" },
+            { "openTime": 1548633600000, "open": 3527.66, "high": 3648.89, "low": 3344.91, "close": 3413.46, "volume": 7970.213109, "closeTime": 1549238399999, "quoteAssetVolume": 27306084.14310785, "numberOfTrades": 63031, "takerBuyBaseAssetVolume": 2735.861931, "takerBuyQuoteAssetVolume": 9372239.78424299, "ignore": "0" },
+            { "openTime": 1549238400000, "open": 3413.24, "high": 3721.3, "low": 3300, "close": 3651.57, "volume": 4759.333163, "closeTime": 1549843199999, "quoteAssetVolume": 16558199.27091057, "numberOfTrades": 45643, "takerBuyBaseAssetVolume": 2135.295321, "takerBuyQuoteAssetVolume": 7450431.90422198, "ignore": "0" },
+            { "openTime": 1549843200000, "open": 3651.57, "high": 3652.61, "low": 3520.1, "close": 3628.54, "volume": 4573.828116, "closeTime": 1550447999999, "quoteAssetVolume": 16361604.77238146, "numberOfTrades": 47475, "takerBuyBaseAssetVolume": 2504.941754, "takerBuyQuoteAssetVolume": 8964726.9792465, "ignore": "0" },
+            { "openTime": 1550448000000, "open": 3628.54, "high": 4184.27, "low": 3613.87, "close": 3721.64, "volume": 6299.287635, "closeTime": 1551052799999, "quoteAssetVolume": 24434977.61003597, "numberOfTrades": 69391, "takerBuyBaseAssetVolume": 2877.825883, "takerBuyQuoteAssetVolume": 11187847.25304894, "ignore": "0" }
+        ]
+    }
+}

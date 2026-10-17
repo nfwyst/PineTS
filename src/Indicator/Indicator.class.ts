@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 LuxAlgo
 
-import { transpile } from '../transpiler/index';
+import { transpile, transpilePineTS } from '../transpiler/index';
+import { LibraryGraph } from '../libraries/LibraryGraph';
 import { VIEWPORT_DEPENDENT_BUILTINS } from '../transpiler/settings';
 import { scanInputs } from './scanInputs';
 import { buildInputProxy } from './inputProxy';
@@ -9,7 +10,7 @@ import { normalizeColorToRgbaHex } from '../namespaces/color/PineColor';
 import { scanDeclaration } from './scanDeclaration';
 import { propsForDeclaration } from './propsSchema';
 import { buildPropProxy } from './propProxy';
-import type { IPineInput, IPineProp, PreparedScript } from './types';
+import type { IPineInput, IPineProp, IndicatorPrepareOptions, PreparedScript } from './types';
 
 /**
  * The single owner of every per-script artifact. Holds the source, lazily
@@ -47,6 +48,7 @@ export class Indicator {
 
     // Lazy artifacts — populated on first prepare() call.
     private _prepared: PreparedScript | null = null;
+    private readonly _linkedPrepared = new WeakMap<LibraryGraph, Promise<PreparedScript>>();
     private _inputMeta: IPineInput[] | null = null;
     private _inputValues: Record<string, unknown> = {};
     private _explicitOverrides = new Set<string>(); // canonical keys the user wrote via .input.X = ...
@@ -60,10 +62,13 @@ export class Indicator {
     private _declarationType: 'indicator' | 'strategy' | null = null;
     private _sourcePropArgs: Record<string, unknown> = {};
     private _explicitPropOverrides = new Set<string>(); // names the user wrote via .prop.X = ...
+    private _revision = 0;
+    private _legacyInputsSnapshot: Record<string, unknown> = {};
 
     constructor(source: Function | string, inputs: Record<string, unknown> = {}) {
         this.source = source;
         this.inputs = inputs;
+        this._legacyInputsSnapshot = { ...inputs };
 
         // `.input` is a frozen container. The Proxy itself is lazy — built on
         // first access so we don't pay the AST scan when callers never touch it.
@@ -98,6 +103,18 @@ export class Indicator {
         return new Indicator(arg);
     }
 
+    /** Increments whenever a runtime input or declaration prop override changes. */
+    public get revision(): number {
+        const keys = Object.keys(this.inputs);
+        const legacyInputsChanged = keys.length !== Object.keys(this._legacyInputsSnapshot).length
+            || keys.some((key) => !Object.is(this.inputs[key], this._legacyInputsSnapshot[key]));
+        if (legacyInputsChanged) {
+            this._legacyInputsSnapshot = { ...this.inputs };
+            this._revision++;
+        }
+        return this._revision;
+    }
+
     /**
      * Idempotent transpile + scan + viewport detection. The result is cached
      * on the instance, so passing the same Indicator to multiple `pine.run()`
@@ -106,16 +123,39 @@ export class Indicator {
      * NB: cache is keyed by *instance identity*, not by options. If you need
      * different debug settings, create a new Indicator.
      */
-    public prepare(opts: { debug?: boolean; ln?: boolean } = {}): PreparedScript {
+    public prepare(opts: IndicatorPrepareOptions = {}): PreparedScript {
         if (this._prepared) return this._prepared;
 
         const fn = transpile(this.source, { debug: !!opts.debug, ln: opts.ln });
 
+        this._prepared = this._buildPrepared(fn);
+        return this._prepared;
+    }
+
+    /** Resolve and link imports without changing the synchronous no-import API. */
+    public async prepareWithLibraries(graph: LibraryGraph, opts: IndicatorPrepareOptions = {}): Promise<PreparedScript> {
+        if (!graph.hasImports(this.source)) return this.prepare(opts);
+
+        const cached = this._linkedPrepared.get(graph);
+        if (cached) return cached;
+
+        const pending = graph
+            .link(this.source)
+            .then(({ code, version, warnings }) => this._buildPrepared(transpilePineTS(code, version, { debug: !!opts.debug, ln: opts.ln }, warnings)))
+            .catch((error: unknown) => {
+                this._linkedPrepared.delete(graph);
+                throw error;
+            });
+        this._linkedPrepared.set(graph, pending);
+        return pending;
+    }
+
+    private _buildPrepared(fn: Function): PreparedScript {
         const usesVisibleRange = detectViewportUsage(fn);
         const ltfSlices = (fn as any)._ltfSlices;
 
         const self = this;
-        this._prepared = {
+        return {
             fn,
             get inputs() {
                 return self.getRuntimeInputs();
@@ -123,7 +163,6 @@ export class Indicator {
             usesVisibleRange,
             ltfSlices,
         };
-        return this._prepared;
     }
 
     /** True iff the script references any built-in in `VIEWPORT_DEPENDENT_BUILTINS`. */
@@ -219,7 +258,10 @@ export class Indicator {
                 m.defval = normalizeColorToRgbaHex(m.defval);
             }
         }
-        const built = buildInputProxy(this._inputMeta, (key) => this._explicitOverrides.add(key));
+        const built = buildInputProxy(this._inputMeta, (key) => {
+            this._explicitOverrides.add(key);
+            this._revision++;
+        });
         this._inputValues = built.values;
         this._inputProxy = built.proxy;
         this._inputMetaByKey = built.metaByKey;
@@ -239,7 +281,10 @@ export class Indicator {
         const built = buildPropProxy(
             this._propMeta,
             this._sourcePropArgs,
-            (name) => this._explicitPropOverrides.add(name),
+            (name) => {
+                this._explicitPropOverrides.add(name);
+                this._revision++;
+            },
         );
         this._propValues = built.values;
         this._propProxy = built.proxy;

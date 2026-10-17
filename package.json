@@ -1,7 +1,7 @@
 {
-    "name": "pinets",
-    "version": "0.11.1",
-    "description": "Run Pine Script anywhere. PineTS is an open-source transpiler and runtime that brings Pine Script logic to Node.js and the browser with 1:1 syntax compatibility. Reliably write, port, and run indicators or strategies on your own infrastructure.",
+    "name": "@nfwyst/pinets",
+    "version": "0.11.1-nfwyst.8",
+    "description": "The nfwyst-maintained PineTS fork for running Pine Script indicators and strategies in Node.js and the browser.",
     "keywords": [
         "Pine Script",
         "Pine",
@@ -31,7 +31,10 @@
     "types": "dist/types/index.d.ts",
     "exports": {
         ".": {
-            "types": "./dist/types/index.d.ts",
+            "types": {
+                "import": "./dist/types/index.d.ts",
+                "require": "./dist/types/cjs/index.d.ts"
+            },
             "node": {
                 "import": "./dist/pinets.min.es.js",
                 "require": "./dist/pinets.min.cjs"
@@ -48,33 +51,40 @@
         "dist/types"
     ],
     "type": "module",
+    "packageManager": "bun@1.4.4",
     "scripts": {
-        "test": "cross-env TEST_ENV=true vitest --reporter verbose",
-        "test:coverage": "cross-env TEST_ENV=true vitest run --coverage",
-        "test:coverage:badge": "cross-env TEST_ENV=true vitest run --coverage --exclude tests/_local/**",
-        "generate:badges": "npm run test:coverage:badge && node scripts/generate-badges.js",
-        "generate:ta-index": "node scripts/generate-ta-index.js",
-        "generate:math-index": "node scripts/generate-math-index.js",
-        "generate:array-index": "node scripts/generate-array-index.js",
-        "generate:input-index": "node scripts/generate-input-index.js",
-        "generate:request-index": "node scripts/generate-request-index.js",
-        "generate:map-index": "node scripts/generate-map-index.js",
-        "generate:matrix-index": "node scripts/generate-matrix-index.js",
-        "build:dev:all": "npm run generate:ta-index && npm run generate:math-index && npm run generate:array-index && npm run generate:input-index && npm run generate:request-index && npm run generate:map-index && npm run generate:matrix-index && npm run build:dev:browser && npm run build:dev:cjs && npm run build:dev:es && npm run build:dev:browser-es && tsc --emitDeclarationOnly --declaration --outDir dist/types -p tsconfig.dts.json",
-        "build:dev:cjs": "cross-env BUILD=dev FORMAT=cjs rollup -c ./rollup.config.js",
-        "build:dev:browser": "cross-env BUILD=dev FORMAT=browser rollup -c ./rollup.config.js",
-        "build:dev:browser-es": "cross-env BUILD=dev FORMAT=browser-es rollup -c ./rollup.config.js",
-        "build:dev:es": "cross-env BUILD=dev rollup -c ./rollup.config.js",
-        "build:prod:all": "npm run generate:ta-index && npm run generate:math-index && npm run generate:array-index && npm run generate:input-index && npm run generate:request-index && npm run generate:map-index && npm run generate:matrix-index && npm run build:prod:browser && npm run build:prod:cjs && npm run build:prod:es && npm run build:prod:browser-es && tsc --emitDeclarationOnly --declaration --outDir dist/types -p tsconfig.dts.json",
-        "build:prod:cjs": "cross-env BUILD=prod FORMAT=cjs rollup -c ./rollup.config.js",
-        "build:prod:browser": "cross-env BUILD=prod FORMAT=browser rollup -c ./rollup.config.js",
-        "build:prod:browser-es": "cross-env BUILD=prod FORMAT=browser-es rollup -c ./rollup.config.js",
-        "build:prod:es": "cross-env BUILD=prod rollup -c ./rollup.config.js",
-        "prepublishOnly": "npm run build:prod:all",
-        "knip": "knip"
+        "test": "TEST_ENV=true bunx --bun vitest --reporter verbose",
+        "test:ci": "TEST_ENV=true PINETS_OFFLINE_TESTS=true TZ=UTC bunx --bun vitest run --reporter dot --silent=passed-only",
+        "test:live": "TEST_ENV=true TZ=UTC bunx --bun vitest run tests/core/livestream.test.ts tests/namespaces/request-streaming.test.ts --reporter dot --silent=passed-only",
+        "typecheck": "bunx --bun tsc --noEmit -p tsconfig.dts.json",
+        "test:coverage": "TEST_ENV=true bunx --bun vitest run --coverage",
+        "test:coverage:badge": "TEST_ENV=true bunx --bun vitest run --coverage --exclude tests/_local/**",
+        "generate:badges": "bun run test:coverage:badge && bun run scripts/generate-badges.js",
+        "generate:ta-index": "bun run scripts/generate-ta-index.js",
+        "generate:math-index": "bun run scripts/generate-math-index.js",
+        "generate:array-index": "bun run scripts/generate-array-index.js",
+        "generate:input-index": "bun run scripts/generate-input-index.js",
+        "generate:request-index": "bun run scripts/generate-request-index.js",
+        "generate:map-index": "bun run scripts/generate-map-index.js",
+        "generate:matrix-index": "bun run scripts/generate-matrix-index.js",
+        "build:dev:all": "bun run generate:ta-index && bun run generate:math-index && bun run generate:array-index && bun run generate:input-index && bun run generate:request-index && bun run generate:map-index && bun run generate:matrix-index && bun run build:dev:browser && bun run build:dev:cjs && bun run build:dev:es && bun run build:dev:browser-es && bunx --bun tsc --emitDeclarationOnly --declaration --outDir dist/types -p tsconfig.dts.json && bun run scripts/prepare-declarations.js",
+        "build:dev:cjs": "BUILD=dev FORMAT=cjs bunx --bun rollup -c ./rollup.config.js",
+        "build:dev:browser": "BUILD=dev FORMAT=browser bunx --bun rollup -c ./rollup.config.js",
+        "build:dev:browser-es": "BUILD=dev FORMAT=browser-es bunx --bun rollup -c ./rollup.config.js",
+        "build:dev:es": "BUILD=dev bunx --bun rollup -c ./rollup.config.js",
+        "build:prod:all": "bun run generate:ta-index && bun run generate:math-index && bun run generate:array-index && bun run generate:input-index && bun run generate:request-index && bun run generate:map-index && bun run generate:matrix-index && bun run build:prod:browser && bun run build:prod:cjs && bun run build:prod:es && bun run build:prod:browser-es && bunx --bun tsc --emitDeclarationOnly --declaration --outDir dist/types -p tsconfig.dts.json && bun run scripts/prepare-declarations.js",
+        "build:prod:cjs": "BUILD=prod FORMAT=cjs bunx --bun rollup -c ./rollup.config.js",
+        "build:prod:browser": "BUILD=prod FORMAT=browser bunx --bun rollup -c ./rollup.config.js",
+        "build:prod:browser-es": "BUILD=prod FORMAT=browser-es bunx --bun rollup -c ./rollup.config.js",
+        "build:prod:es": "BUILD=prod bunx --bun rollup -c ./rollup.config.js",
+        "prepublishOnly": "bun run build:prod:all",
+        "knip": "bunx --bun knip"
     },
     "author": "LuxAlgo",
     "license": "AGPL-3.0-only",
+    "publishConfig": {
+        "access": "public"
+    },
     "dependencies": {
         "acorn": "^8.14.0",
         "acorn-walk": "^8.3.4",
@@ -90,14 +100,12 @@
         "@vitest/coverage-v8": "^4.1.0",
         "autoprefixer": "^10.4.23",
         "badgen": "^3.2.3",
-        "cross-env": "^7.0.3",
         "knip": "^5.43.6",
         "postcss": "^8.5.6",
         "rollup-plugin-esbuild": "^6.2.1",
         "rollup-plugin-sourcemaps": "^0.6.3",
         "rollup-plugin-typescript-paths": "^1.5.0",
         "tailwindcss": "^4.1.18",
-        "tsx": "^4.21.0",
         "typescript": "~5.9.3",
         "vite": "^7.3.1",
         "vite-tsconfig-paths": "^4.3.2",
@@ -105,7 +113,10 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/LuxAlgo/PineTS.git"
+        "url": "git+https://github.com/nfwyst/PineTS.git"
     },
-    "homepage": "https://www.luxalgo.com/pinets"
+    "bugs": {
+        "url": "https://github.com/nfwyst/PineTS/issues"
+    },
+    "homepage": "https://github.com/nfwyst/PineTS#readme"
 }

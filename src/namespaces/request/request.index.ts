@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // This file is auto-generated. Do not edit manually.
-// Run: npm run generate:request-index
+// Run: bun run generate:request-index
 
 import { currency_rate } from './methods/currency_rate';
 import { dividends } from './methods/dividends';

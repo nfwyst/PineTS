@@ -165,15 +165,15 @@ export function myFunc(context: any) {
 **Problem:**
 
 ```javascript
-// ❌ Returning raw floating point (inconsistent precision)
+// ❌ Bypassing the runtime's numeric boundary
 return sum / period; // 14.666666666666667
 ```
 
 **Solution:**
 
 ```javascript
-// ✅ Use context.precision() for consistent rounding
-return context.precision(sum / period); // 14.6666666667 (10 decimals)
+// ✅ Preserve Pine's internal precision through the runtime boundary
+return context.precision(sum / period); // 14.666666666666667
 ```
 
 ### ⚠️ Pitfall 8: Recalculating Instead of Incremental Updates
@@ -475,9 +475,9 @@ tests/namespaces/
 
 ```bash
 # After adding new method
-npm run generate:ta-index
-npm run generate:math-index
-npm run generate:array-index
+bun run generate:ta-index
+bun run generate:math-index
+bun run generate:array-index
 # etc.
 ```
 
@@ -493,4 +493,4 @@ Before submitting TA function implementations:
 -   [ ] Includes unit tests with expected values
 -   [ ] Tested with multiple calls (same parameters)
 -   [ ] Tested with edge cases (single bar, all NaN, etc.)
--   [ ] Regenerated barrel file (`npm run generate:*-index`)
+-   [ ] Regenerated barrel file (`bun run generate:*-index`)

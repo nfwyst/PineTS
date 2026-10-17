@@ -3,6 +3,7 @@
 import { PineArrayObject } from '../PineArrayObject';
 import { isValueOfType } from '../utils';
 import { Context } from '../../../Context.class';
+import { assertCollectionGrowth } from '../../limits';
 
 export function unshift(context: Context) {
     return (id: PineArrayObject, value: any): void => {
@@ -13,6 +14,7 @@ export function unshift(context: Context) {
                 }' is expected.`
             );
         }
+        assertCollectionGrowth(id.array.length, 1, 'array.unshift');
         id.array.unshift(typeof value === 'number' ? context.precision(value) : value);
     };
 }

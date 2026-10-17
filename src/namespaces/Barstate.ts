@@ -1,14 +1,18 @@
 import { Series } from '../Series';
 
 export class Barstate {
-    private _live: boolean = false;
+    private _lastExecutionBarIndex: number | undefined;
+    private _isNew = true;
 
     constructor(private context: any) {}
-    public setLive() {
-        this._live = true;
+
+    public beginExecution(barIndex: number) {
+        this._isNew = barIndex !== this._lastExecutionBarIndex;
+        this._lastExecutionBarIndex = barIndex;
     }
+
     public get isnew() {
-        return !this._live;
+        return this._isNew;
     }
 
     public get islast() {
@@ -54,20 +58,13 @@ export class Barstate {
         if (idx === totalBars - 1) {
             // Last bar in the dataset — true only if market is closed
             // (i.e., this bar's close time is in the past → it's confirmed)
-            const closeTime = this.context.data.closeTime.data[idx];
-            return closeTime <= Date.now();
+            return this.context.normalizedCloseTime[idx] <= Date.now();
         }
 
         if (idx === totalBars - 2) {
             // Second-to-last bar — true if the last bar is a live/realtime bar
             // (i.e., the last bar's close time is still in the future).
-            // Read from context.marketData (full raw candle array, available
-            // before iteration starts) to peek at the last bar's close time.
-            const lastCloseTime = this.context.marketData?.[totalBars - 1]?.closeTime;
-            if (lastCloseTime !== undefined) {
-                return lastCloseTime > Date.now();
-            }
-            return false;
+            return this.context.normalizedCloseTime[totalBars - 1] > Date.now();
         }
 
         return false;

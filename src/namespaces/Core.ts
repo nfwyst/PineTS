@@ -497,13 +497,13 @@ export class Core {
         return val.toString();
     }
 
-    Type(definition: Record<string, string | [string, any]>, typeName?: string) {
+    Type(definition: Record<string, string | [string, any]>, typeName?: string, pineVersionOverride?: number) {
         // Extract field names, types, and defaults from definition.
         // Fields can be either 'type' (no default) or ['type', defaultValue].
         const definitionKeys = Object.keys(definition);
         const fieldTypes: Record<string, string> = {};
         const fieldDefaults: Record<string, any> = {};
-        const pineVersion = this.context?.pineVersion;
+        const pineVersion = pineVersionOverride ?? this.context?.pineVersion;
         for (const key of definitionKeys) {
             let val: any = definition[key];
             // $.param() wraps ['type', default] arrays in Series — unwrap them

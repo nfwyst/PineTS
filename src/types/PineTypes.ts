@@ -1,5 +1,44 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+export type ChartTheme = {
+    readonly background: string;
+    readonly foreground: string;
+};
+
+export const DEFAULT_CHART_THEME: ChartTheme = Object.freeze({
+    background: '#1e293b',
+    foreground: '#d1d4dc',
+});
+
+export type LibraryImportRequest = {
+    readonly user: string;
+    readonly name: string;
+    readonly version: string;
+    readonly from: string;
+};
+
+export type LibraryResolver = (request: LibraryImportRequest) => Promise<string | undefined>;
+
+export type PineTSOptions = {
+    readonly chartTheme?: ChartTheme;
+    readonly resolveLibrary?: LibraryResolver;
+};
+
+export type ResolvedPineTSOptions = {
+    readonly chartTheme: ChartTheme;
+    readonly resolveLibrary: LibraryResolver | undefined;
+};
+
+export type AlertEvent = {
+    type: 'alert' | 'alertcondition';
+    id: string;
+    message: unknown;
+    title?: string;
+    freq?: string;
+    bar_index: number;
+    time: number;
+};
+
 export type PlotCharOptions = {
     title?: string;
     char?: string;

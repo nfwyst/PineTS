@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Context, PineTS, Provider } from 'index';
+import { normalizePlotString } from '../../utils';
 
 describe('Array Stack & Queue Operations', () => {
     it('invalid INSERT, PUSH, SET, UNSHIFT', async () => {
@@ -112,7 +113,7 @@ describe('Array Stack & Queue Operations', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('PUSH, POP, UNSHIFT, SHIFT, INSERT, REMOVE, CLEAR', async () => {
@@ -178,6 +179,6 @@ describe('Array Stack & Queue Operations', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });

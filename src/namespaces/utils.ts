@@ -30,12 +30,14 @@ const TYPE_CHECK = {
     // (primitives, tuples, objects, Series, ...).
     any: () => true,
 
-    // Named-args bags emitted by the transpiler are always plain `{key: val}`
-    // objects — never arrays. Excluding arrays here lets functions like
-    // request.security accept tuple expressions (e.g. `[o, c]`) as a positional
-    // arg without misinterpreting them as the options bag.
-    remaining_options: (arg) =>
-        arg !== null && typeof arg === 'object' && !Array.isArray(arg) && !(arg instanceof Series) && !(arg instanceof ChartPointObject) && !isPlot(arg) && !isScalarHelper(arg),
+    // Named-args bags emitted by the transpiler are plain object literals.
+    // Restricting this slot to plain objects prevents Pine values such as UDTs,
+    // arrays, maps, matrices, Series, and chart points from being consumed as options.
+    remaining_options: (arg) => {
+        if (arg === null || typeof arg !== 'object' || Array.isArray(arg) || isPlot(arg) || isScalarHelper(arg)) return false;
+        const prototype = Object.getPrototypeOf(arg);
+        return prototype === Object.prototype || prototype === null;
+    },
 };
 
 export type PineTypeMap<T> = {
@@ -51,6 +53,10 @@ export type PineTypeMap<T> = {
         ? 'array'
         : never;
 };
+
+export function isNamedArgsBag(arg: unknown): arg is Record<string, unknown> {
+    return TYPE_CHECK.remaining_options(arg);
+}
 
 /**
  * Extract a transpiler-injected callsite ID from the end of an arguments array.

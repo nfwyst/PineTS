@@ -2,11 +2,15 @@
 
 import { PineMatrixObject } from '../PineMatrixObject';
 import { Context } from '../../../Context.class';
+import { assertCollectionGrowth } from '../../limits';
 
 export function concat(context: Context) {
     return (id: PineMatrixObject, id2: PineMatrixObject) => {
         const rows1 = id.matrix.length;
         const rows2 = id2.matrix.length;
+        const cols2 = rows2 > 0 ? id2.matrix[0].length : 0;
+        const cols1 = rows1 > 0 ? id.matrix[0].length : cols2;
+        assertCollectionGrowth(rows1 * cols1, rows2 * cols2, 'matrix.concat');
         if (rows1 === 0) {
             // If first matrix is empty, assume we adopt the structure of the second
             // But concat appends rows usually? Or does it append columns?
@@ -18,9 +22,6 @@ export function concat(context: Context) {
         }
         
         // If cols match, append rows
-        const cols1 = id.matrix[0].length;
-        const cols2 = rows2 > 0 ? id2.matrix[0].length : 0;
-        
         if (cols1 !== cols2 && rows2 > 0) {
             // Error or ignore? Pine script throws runtime error.
             console.error(`matrix.concat: Column count mismatch ${cols1} vs ${cols2}`);

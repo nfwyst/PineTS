@@ -23,5 +23,19 @@ export { aggregateCandles, selectSubTimeframe, getAggregationRatio } from './mar
 export { splitTickerModifier, stripTickerModifier, withTickerModifier, decodeTickerId, encodeTickerId } from './tickerModifier';
 
 export { PineTS, Context, Provider, Indicator, PineRuntimeError };
-export type { IPineInput, IPineProp, PineInputType, PineInputDisplay, PinePropType, PreparedScript } from './Indicator';
+export type {
+    AlertEvent,
+    ChartTheme,
+    IndicatorPrepareOptions,
+    IPineInput,
+    IPineProp,
+    LibraryImportRequest,
+    LibraryResolver,
+    PineInputType,
+    PineInputDisplay,
+    PinePropType,
+    PineTSOptions,
+    PreparedScript,
+    ResolvedPineTSOptions,
+} from './Indicator';
 export { INDICATOR_PROPS, STRATEGY_PROPS, propsForDeclaration } from './Indicator';

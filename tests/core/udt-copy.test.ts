@@ -53,7 +53,7 @@ plot(c.copy().lon, "constructor_value")
         }
     });
 
-    it('copies current field values, keeps copies independent, and shares nested references', async () => {
+    it('shallow-copies current field values, keeps scalar copies independent, and shares nested references', async () => {
         const code = `
 //@version=6
 indicator("udt copy cases")

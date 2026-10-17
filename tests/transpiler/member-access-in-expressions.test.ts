@@ -62,6 +62,48 @@ var pts = array.new<P>()
 pts.push(P.new(bar_index * 1.0, bar_index))
 o = Outer.new(M.new(bar_index * 2.0))`;
 
+    it('temporary-variable control returns the last member value', async () => {
+        const { get } = await run(`${UDT}
+lastValue() =>
+    P point = pts.last()
+    point.price
+plot(lastValue(), "value")`);
+        expectSeries(get('value'), (i) => i);
+    });
+
+    it('direct return matches the temporary-variable control in UDF and global scopes', async () => {
+        const { get } = await run(`${UDT}
+lastValue() =>
+    pts.last().price
+lastValueViaTemp() =>
+    P point = pts.last()
+    point.price
+globalValue = pts.last().price
+plot(lastValue(), "direct")
+plot(lastValueViaTemp(), "control")
+plot(globalValue, "global")`);
+        expect(get('direct')).toEqual(get('control'));
+        expect(get('direct')).toEqual(get('global'));
+        expectSeries(get('direct'), (i) => i);
+    });
+
+    it('nested and missing member chains stay safe in function results', async () => {
+        const { get } = await run(`${UDT}
+missing = Outer.new(M.new())
+nestedValue() =>
+    o.inner.body
+missingValue() =>
+    missing.inner.body
+plot(nestedValue(), "nestedDirect")
+plot(o.inner.body, "nestedGlobal")
+plot(na(missingValue()) ? 1 : 0, "missingDirect")
+plot(na(missing.inner.body) ? 1 : 0, "missingGlobal")`);
+        expect(get('nestedDirect')).toEqual(get('nestedGlobal'));
+        expectSeries(get('nestedDirect'), (i) => i * 2);
+        expect(get('missingDirect')).toEqual(get('missingGlobal'));
+        expectSeries(get('missingDirect'), () => 1);
+    });
+
     it('lowers field access on a global in a function return value', async () => {
         const { get } = await run(`${UDT}
 retCmp() =>

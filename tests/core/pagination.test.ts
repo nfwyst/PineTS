@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PineTS } from 'PineTS.class';
+import { Provider } from '@pinets/marketData/Provider.class';
+import type { IProvider } from '@pinets/marketData/IProvider';
 import { getKlines, arrayPrecision } from '../utils';
 
 describe('Pagination', () => {
@@ -140,7 +142,7 @@ describe('Pagination', () => {
         let callCount = 0;
         const baseKlines = await getKlines('BTCUSDT', '1h', 100, 0, 1736071200000 - 1);
 
-        const mockProvider = {
+        const mockProvider: IProvider = {
             async getMarketData(tickerId: string, timeframe: string, limit?: number, sDate?: number, eDate?: number) {
                 // First call returns initial data
                 if (callCount === 0) {
@@ -165,6 +167,8 @@ describe('Pagination', () => {
 
                 return baseKlines;
             },
+            getSymbolInfo: (tickerId) => Provider.Mock.getSymbolInfo(tickerId),
+            configure: () => undefined,
         };
 
         const pineTS = new PineTS(mockProvider, 'BTCUSDT', '1h');
@@ -221,15 +225,23 @@ describe('Pagination', () => {
         console.log(`   Mock provider called: ${callCount} times`);
     });
 
-    it('should continue fetching new data after historical pages are exhausted (live Binance data)', async () => {
-        // Use real Binance provider that implements IProvider interface
-        const binanceProvider = {
+    it('should continue fetching new data after historical pages are exhausted', async () => {
+        const fixtureKlines = await getKlines('BTCUSDT', '1h', 40, 0, 1736071200000 - 1);
+        let initialRequest = true;
+        const streamingProvider: IProvider = {
             async getMarketData(tickerId: string, timeframe: string, limit?: number, sDate?: number, eDate?: number) {
-                return await getKlines(tickerId, timeframe, limit, sDate, eDate);
+                if (initialRequest) {
+                    initialRequest = false;
+                    return fixtureKlines.slice(0, 30);
+                }
+                const startIndex = fixtureKlines.findIndex((bar) => bar.openTime === sDate);
+                return startIndex < 0 ? [] : fixtureKlines.slice(startIndex, startIndex + 2);
             },
+            getSymbolInfo: (tickerId) => Provider.Mock.getSymbolInfo(tickerId),
+            configure: () => undefined,
         };
 
-        const pineTS = new PineTS(binanceProvider, 'BTCUSDT', '1m'); // Use 1-minute candles for faster test
+        const pineTS = new PineTS(streamingProvider, 'BTCUSDT', '1h');
         await pineTS.ready();
 
         const sourceCode = (context) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrayPrecision, getKlines, runNSFunctionWithArgs } from '../../utils';
+import { arrayPrecision, getKlines, normalizePlotString, runNSFunctionWithArgs } from '../../utils';
 
 import { Context, PineTS, Provider } from 'index';
 
@@ -83,7 +83,7 @@ plotchar(_rbf, '_rbf')
 [0.9231163464, 0.9801986733, 1.0001, 0.9801986733, 0.9231163464]
 [0.8352702114, 0.9231163464, 0.9801986733, 1.0001, 0.9801986733]
 [0.7261490371, 0.8352702114, 0.9231163464, 0.9801986733, 1.0001]
-[2018-12-24T00:00:00.000-00:00]: 0 [1.0001, 0.9801986733, 0.9231163464, 0.8352702114, 0.7261490371]
+[2018-12-24T00:00:00.000-00:00]: 2.1659909e-139 [1.0001, 0.9801986733, 0.9231163464, 0.8352702114, 0.7261490371]
 [0.9801986733, 1.0001, 0.9801986733, 0.9231163464, 0.8352702114]
 [0.9231163464, 0.9801986733, 1.0001, 0.9801986733, 0.9231163464]
 [0.8352702114, 0.9231163464, 0.9801986733, 1.0001, 0.9801986733]
@@ -101,6 +101,6 @@ plotchar(_rbf, '_rbf')
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });

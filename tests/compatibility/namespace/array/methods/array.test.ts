@@ -5,6 +5,7 @@ import * as path from 'path';
 
 import { Provider } from '@pinets/marketData/Provider.class';
 import { deserialize, deepEqual } from '../../../lib/serializer.js';
+import { normalizePlotString } from '../../../../utils';
 
 describe('ARRAY Namespace', () => {
     it('ABS regression test', async () => {
@@ -76,8 +77,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('AVG regression test', async () => {
@@ -144,8 +145,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('CLEAR regression test', async () => {
@@ -213,8 +214,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('CONCAT regression test', async () => {
@@ -285,8 +286,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('COPY regression test', async () => {
@@ -353,8 +354,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('COVARIANCE regression test', async () => {
@@ -429,8 +430,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('EVERY regression test', async () => {
@@ -499,8 +500,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('FILL regression test', async () => {
@@ -565,8 +566,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('FIRST regression test', async () => {
@@ -631,8 +632,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('GET regression test', async () => {
@@ -697,8 +698,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('INCLUDES regression test', async () => {
@@ -766,8 +767,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('INDEXOF regression test', async () => {
@@ -836,8 +837,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('INSERT regression test', async () => {
@@ -906,8 +907,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('JOIN regression test', async () => {
@@ -975,8 +976,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('LAST regression test', async () => {
@@ -1041,8 +1042,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('LASTINDEXOF regression test', async () => {
@@ -1112,8 +1113,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('MAX regression test', async () => {
@@ -1180,8 +1181,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('MIN regression test', async () => {
@@ -1248,8 +1249,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('NEW regression test', async () => {
@@ -1311,8 +1312,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('POP regression test', async () => {
@@ -1382,8 +1383,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('PUSH regression test', async () => {
@@ -1451,8 +1452,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('RANGE regression test', async () => {
@@ -1525,8 +1526,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('REMOVE regression test', async () => {
@@ -1596,8 +1597,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('SET regression test', async () => {
@@ -1661,8 +1662,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('SHIFT regression test', async () => {
@@ -1732,8 +1733,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('SIZE regression test', async () => {
@@ -1792,8 +1793,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('SLICE regression test', async () => {
@@ -1864,8 +1865,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('SOME regression test', async () => {
@@ -1934,8 +1935,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('SORT_INDICES regression test', async () => {
@@ -2005,8 +2006,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('STANDARDIZE regression test', async () => {
@@ -2079,8 +2080,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('STDEV regression test', async () => {
@@ -2147,8 +2148,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('SUM regression test', async () => {
@@ -2215,8 +2216,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('UNSHIFT regression test', async () => {
@@ -2284,8 +2285,8 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('VARIANCE regression test', async () => {
@@ -2352,7 +2353,7 @@ describe('ARRAY Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 });

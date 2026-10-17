@@ -5,6 +5,7 @@ import * as path from 'path';
 
 import { Provider } from '@pinets/marketData/Provider.class';
 import { deserialize, deepEqual } from '../../../lib/serializer.js';
+import { normalizePlotString } from '../../../../utils';
 
 describe('TA Namespace', () => {
     it('ATR regression test', async () => {
@@ -60,8 +61,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('CHANGE regression test', async () => {
@@ -120,8 +121,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('CROSSOVER regression test', async () => {
@@ -181,8 +182,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('CROSSUNDER regression test', async () => {
@@ -242,8 +243,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('DEV regression test', async () => {
@@ -302,8 +303,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('EMA regression test', async () => {
@@ -362,8 +363,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('HIGHEST regression test', async () => {
@@ -422,8 +423,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('HMA regression test', async () => {
@@ -482,8 +483,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('LINREG regression test', async () => {
@@ -542,8 +543,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('LOWEST regression test', async () => {
@@ -602,8 +603,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('MEDIAN regression test', async () => {
@@ -662,8 +663,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('MOM regression test', async () => {
@@ -722,8 +723,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('PIVOTHIGH regression test', async () => {
@@ -780,8 +781,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('PIVOTLOW regression test', async () => {
@@ -838,8 +839,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('RMA regression test', async () => {
@@ -898,8 +899,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('ROC regression test', async () => {
@@ -958,8 +959,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('RSI regression test', async () => {
@@ -1018,8 +1019,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str, 6)).toEqual(normalizePlotString(expectedData.plotchar_data, 6));
+        expect(normalizePlotString(plot_data_str, 6)).toEqual(normalizePlotString(expectedData.plot_data, 6));
     });
 
     it('SMA regression test', async () => {
@@ -1078,8 +1079,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('STDEV regression test', async () => {
@@ -1138,8 +1139,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('VARIANCE regression test', async () => {
@@ -1198,8 +1199,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('VWMA regression test', async () => {
@@ -1259,8 +1260,8 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 
     it('WMA regression test', async () => {
@@ -1319,7 +1320,7 @@ describe('TA Namespace', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 });

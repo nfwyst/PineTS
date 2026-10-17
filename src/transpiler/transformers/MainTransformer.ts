@@ -163,7 +163,7 @@ export function propagateAsyncAwait(ast: any): void {
 // Pine comparison operators → na-aware runtime helpers. Includes the
 // relational operators (<, <=, >, >=), which native JS would evaluate against
 // NaN as `false`; routing them through the helpers makes `na` propagate and
-// applies TradingView's 1e-10 tolerance.
+// applies TradingView's nine-fractional-digit operand rounding.
 const COMPARISON_METHODS: Record<string, string> = {
     '==': '__eq',
     '===': '__eq',
@@ -208,7 +208,7 @@ export function transformEqualityChecks(ast: any): void {
                 // evaluates to `na` (not false) — for ==, !=, and <, <=, >, >=
                 // (verified against TradingView). Native JS would give false
                 // (NaN < 1, NaN == NaN, ...), so we route through the runtime
-                // helpers which propagate `na` and apply the 1e-10 tolerance.
+                // helpers which propagate `na` and round float operands to nine fractional digits.
                 // `na` is falsy, so branch/ternary outcomes are unchanged.
                 const method = COMPARISON_METHODS[node.operator];
                 if (!method) return;

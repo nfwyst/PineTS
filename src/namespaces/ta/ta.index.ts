@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // This file is auto-generated. Do not edit manually.
-// Run: npm run generate:ta-index
+// Run: bun run generate:ta-index
 
 
 
@@ -45,9 +45,9 @@ import { param } from './methods/param';
 import { percentile_linear_interpolation } from './methods/percentile_linear_interpolation';
 import { percentile_nearest_rank } from './methods/percentile_nearest_rank';
 import { percentrank } from './methods/percentrank';
+import { pivot_point_levels } from './methods/pivot_point_levels';
 import { pivothigh } from './methods/pivothigh';
 import { pivotlow } from './methods/pivotlow';
-import { pivot_point_levels } from './methods/pivot_point_levels';
 import { pvi } from './methods/pvi';
 import { pvt } from './methods/pvt';
 import { range } from './methods/range';
@@ -119,9 +119,9 @@ const methods = {
   percentile_linear_interpolation,
   percentile_nearest_rank,
   percentrank,
+  pivot_point_levels,
   pivothigh,
   pivotlow,
-  pivot_point_levels,
   pvi,
   pvt,
   range,
@@ -192,9 +192,9 @@ export class TechnicalAnalysis {
   percentile_linear_interpolation: ReturnType<typeof methods.percentile_linear_interpolation>;
   percentile_nearest_rank: ReturnType<typeof methods.percentile_nearest_rank>;
   percentrank: ReturnType<typeof methods.percentrank>;
+  pivot_point_levels: ReturnType<typeof methods.pivot_point_levels>;
   pivothigh: ReturnType<typeof methods.pivothigh>;
   pivotlow: ReturnType<typeof methods.pivotlow>;
-  pivot_point_levels: ReturnType<typeof methods.pivot_point_levels>;
   pvi: ReturnType<typeof methods.pvi>;
   pvt: ReturnType<typeof methods.pvt>;
   range: ReturnType<typeof methods.range>;

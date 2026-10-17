@@ -5,6 +5,7 @@ import * as path from 'path';
 
 import { Provider } from '@pinets/marketData/Provider.class';
 import { deserialize, deepEqual } from '../lib/serializer.js';
+import { normalizePlotString } from '../../utils';
 
 describe('UNKNOWN Namespace - BBANDS-BREAKOUT-OSCILLATOR Method', () => {
     it('should calculate BBANDS-BREAKOUT-OSCILLATOR correctly with native series and variable series', async () => {
@@ -88,7 +89,7 @@ describe('UNKNOWN Namespace - BBANDS-BREAKOUT-OSCILLATOR Method', () => {
 
         // Assert results using custom deep equality (handles NaN correctly)
         expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizePlotString(plotchar_data_str)).toEqual(normalizePlotString(expectedData.plotchar_data));
+        expect(normalizePlotString(plot_data_str)).toEqual(normalizePlotString(expectedData.plot_data));
     });
 });

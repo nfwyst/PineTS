@@ -119,49 +119,92 @@ function collectPatternNames(pattern: any, out: Set<string>): void {
     }
 }
 
-/**
- * Pass 1 — collect every declared name in the program.
- *
- * Scope is deliberately flattened: a name declared anywhere counts as declared
- * everywhere. This only ever makes the verifier MORE permissive (it never
- * invents a false violation from a real binding), while the attack identifiers
- * it must catch — `process`, `Function`, `globalThis`, … — are never declared
- * anywhere in transpiler output, so they are still caught. If a script shadows
- * one of those names with its own binding, the reference legitimately resolves
- * to that binding and is correctly allowed.
- */
-function collectDeclaredNames(node: any, out: Set<string>, seen: WeakSet<object>): void {
-    if (!node || typeof node !== 'object' || seen.has(node)) return;
-    seen.add(node);
+type Bindings = Map<string, Set<object>>;
 
-    switch (node.type) {
-        case 'VariableDeclarator':
-            collectPatternNames(node.id, out);
-            break;
-        case 'FunctionDeclaration':
-        case 'FunctionExpression':
-        case 'ArrowFunctionExpression':
-            if (node.id?.name) out.add(node.id.name);
-            for (const p of node.params || []) collectPatternNames(p, out);
-            break;
-        case 'ClassDeclaration':
-        case 'ClassExpression':
-            if (node.id?.name) out.add(node.id.name);
-            break;
-        case 'CatchClause':
-            if (node.param) collectPatternNames(node.param, out);
-            break;
+function addPatternBindings(pattern: any, scope: object, bindings: Bindings): void {
+    const names = new Set<string>();
+    collectPatternNames(pattern, names);
+    for (const name of names) {
+        const scopes = bindings.get(name) ?? new Set<object>();
+        scopes.add(scope);
+        bindings.set(name, scopes);
+    }
+}
+
+/** Record each binding against the lexical scope where JavaScript resolves it. */
+function collectBindings(node: any, lexicalScope: object, functionScope: object, bindings: Bindings): void {
+    if (!node || typeof node !== 'object' || typeof node.type !== 'string') return;
+
+    if (node.type === 'Program') {
+        for (const statement of node.body || []) collectBindings(statement, node, node, bindings);
+        return;
+    }
+
+    if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
+        if (node.id) {
+            if (node.type === 'FunctionDeclaration') addPatternBindings(node.id, lexicalScope, bindings);
+            addPatternBindings(node.id, node, bindings);
+        }
+        for (const parameter of node.params || []) addPatternBindings(parameter, node, bindings);
+        collectBindings(node.body, node, node, bindings);
+        return;
+    }
+
+    if (node.type === 'BlockStatement') {
+        for (const statement of node.body || []) collectBindings(statement, node, functionScope, bindings);
+        return;
+    }
+
+    if (node.type === 'VariableDeclaration') {
+        const scope = node.kind === 'var' ? functionScope : lexicalScope;
+        for (const declaration of node.declarations || []) {
+            addPatternBindings(declaration.id, scope, bindings);
+            collectBindings(declaration.init, lexicalScope, functionScope, bindings);
+        }
+        return;
+    }
+
+    if (node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
+        collectBindings(node.init ?? node.left, node, functionScope, bindings);
+        collectBindings(node.test ?? node.right, node, functionScope, bindings);
+        collectBindings(node.update, node, functionScope, bindings);
+        collectBindings(node.body, node, functionScope, bindings);
+        return;
+    }
+
+    if (node.type === 'CatchClause') {
+        addPatternBindings(node.param, node, bindings);
+        collectBindings(node.body, node, functionScope, bindings);
+        return;
+    }
+
+    if (node.type === 'SwitchStatement') {
+        collectBindings(node.discriminant, lexicalScope, functionScope, bindings);
+        for (const switchCase of node.cases || []) collectBindings(switchCase, node, functionScope, bindings);
+        return;
+    }
+
+    if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
+        if (node.id) {
+            if (node.type === 'ClassDeclaration') addPatternBindings(node.id, lexicalScope, bindings);
+            addPatternBindings(node.id, node, bindings);
+        }
     }
 
     for (const key of Object.keys(node)) {
         if (SKIP_KEYS.has(key)) continue;
         const value = node[key];
         if (Array.isArray(value)) {
-            for (const child of value) collectDeclaredNames(child, out, seen);
-        } else if (value && typeof value === 'object' && typeof value.type === 'string') {
-            collectDeclaredNames(value, out, seen);
+            for (const child of value) collectBindings(child, lexicalScope, functionScope, bindings);
+        } else {
+            collectBindings(value, lexicalScope, functionScope, bindings);
         }
     }
+}
+
+function isBound(name: string, bindings: Bindings, ancestors: readonly object[]): boolean {
+    const scopes = bindings.get(name);
+    return scopes !== undefined && ancestors.some((ancestor) => scopes.has(ancestor));
 }
 
 /**
@@ -188,7 +231,14 @@ function assertPropertyAllowed(name: unknown): void {
  * let us tell a member-property or object-key identifier (never a reference)
  * from a true reference.
  */
-function verifyNode(node: any, parent: any, keyInParent: string | null, declared: Set<string>, seen: WeakSet<object>): void {
+function verifyNode(
+    node: any,
+    parent: any,
+    keyInParent: string | null,
+    bindings: Bindings,
+    ancestors: readonly object[],
+    seen: WeakSet<object>,
+): void {
     if (!node || typeof node !== 'object' || typeof node.type !== 'string' || seen.has(node)) return;
     seen.add(node);
 
@@ -222,7 +272,7 @@ function verifyNode(node: any, parent: any, keyInParent: string | null, declared
             // `Error.captureStackTrace(...)`) would reach and mutate the
             // process-global Error object, so it is rejected like any host global.
             if (node.name === 'Error' && parent?.type === 'NewExpression' && keyInParent === 'callee') return;
-            if (!declared.has(node.name) && !SAFE_FREE_IDENTIFIERS.has(node.name)) {
+            if (!isBound(node.name, bindings, ancestors) && !SAFE_FREE_IDENTIFIERS.has(node.name)) {
                 throw new ClosedWorldViolation(`Undeclared identifier "${node.name}"`);
             }
             return;
@@ -244,9 +294,9 @@ function verifyNode(node: any, parent: any, keyInParent: string | null, declared
         if (SKIP_KEYS.has(key)) continue;
         const value = node[key];
         if (Array.isArray(value)) {
-            for (const child of value) verifyNode(child, node, key, declared, seen);
+            for (const child of value) verifyNode(child, node, key, bindings, [...ancestors, node], seen);
         } else if (value && typeof value === 'object' && typeof value.type === 'string') {
-            verifyNode(value, node, key, declared, seen);
+            verifyNode(value, node, key, bindings, [...ancestors, node], seen);
         }
     }
 }
@@ -258,7 +308,7 @@ function verifyNode(node: any, parent: any, keyInParent: string | null, declared
  * on the first offending node.
  */
 export function verifyClosedWorld(ast: any): void {
-    const declared = new Set<string>();
-    collectDeclaredNames(ast, declared, new WeakSet<object>());
-    verifyNode(ast, null, null, declared, new WeakSet<object>());
+    const bindings: Bindings = new Map();
+    collectBindings(ast, ast, ast, bindings);
+    verifyNode(ast, null, null, bindings, [], new WeakSet<object>());
 }

@@ -19,9 +19,9 @@ export interface FootprintParams {
 }
 
 /**
- * Comparison tolerance shared with the transpiled `>=` helper (`math.__ge`), so a
- * row whose buy volume is exactly 3× the neighbour's sell volume still counts as
- * imbalanced when binary rounding lands a hair below the threshold.
+ * Additive tolerance for footprint-internal volume comparisons, so a row whose
+ * buy volume is exactly 3× the neighbour's sell volume still counts as imbalanced
+ * when binary rounding lands a hair below the threshold.
  */
 const EPSILON = 1e-10;
 

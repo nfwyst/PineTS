@@ -35,8 +35,12 @@ import {
     SwitchExpression,
     SwitchCase,
     VariableDeclarationKind,
+    ImportDeclaration,
 } from './ast';
+import type { LibraryExportDescriptor, LibraryExportKind, SourceSpan } from './ast';
 import { NAMESPACE_COLLISION_NAMES } from '../settings';
+
+const TYPE_QUALIFIERS = new Set(['const', 'simple', 'series']);
 
 export class Parser {
     private tokens: Token[];
@@ -65,6 +69,9 @@ export class Parser {
     private functionParamNames: Map<string, string[] | null> = new Map();
     // Opening `[` of each tuple literal, for errors reported at the literal.
     private tupleLiteralStart: WeakMap<object, Token> = new WeakMap();
+    private libraryImports: ImportDeclaration[] = [];
+    private libraryExports: LibraryExportDescriptor[] = [];
+    private importAliases: Set<string> = new Set();
     constructor(tokens: Token[]) {
         this.tokens = tokens;
         this.pos = 0;
@@ -238,9 +245,56 @@ export class Parser {
         }
     }
 
+    /**
+     * A user-defined-type field's default has the same rule as a function
+     * parameter default: it must be a literal, a signed literal, `na`, a
+     * bare built-in/series-qualified variable (`low`, `close`), or a
+     * qualified built-in constant (`color.red`, an enum value such as
+     * `state.down`). TradingView rejects function calls (`array.new<float>()`,
+     * `math.max(1, 2)`), user variables and calculations with CE10133.
+     *
+     * Note `float x = low` IS legal Pine (the field defaults to the series
+     * builtin on each bar — see tests/core/udt-field-defaults "series
+     * defaults"), so a bare Identifier other than `na` is allowed; only
+     * calls, calculations and ternaries are rejected here.
+     */
+    private assertTypeFieldDefault(value: any, startToken: Token): void {
+        const isSignedLiteral =
+            value?.type === 'UnaryExpression' &&
+            ['-', '+'].includes(value.operator) &&
+            value.argument?.type === 'Literal';
+        const isQualifiedConstant =
+            value?.type === 'MemberExpression' &&
+            !value.computed &&
+            value.property?.type === 'Identifier';
+        const allowed =
+            value?.type === 'Literal' ||
+            value?.type === 'Identifier' ||
+            isSignedLiteral ||
+            isQualifiedConstant;
+        if (!allowed) {
+            throw new Error(`The default value cannot be a function, variable or calculation. at ${this.startOf(startToken)}`);
+        }
+    }
+
     /** `line:column` of a token's first character (tokens carry the column just past their end). */
     private startOf(token: Token): string {
         return `${token.line}:${token.column - String(token.value).length}`;
+    }
+
+    private sourceSpan(start: Token, end: Token): SourceSpan {
+        return {
+            start: { line: start.line, column: start.column - String(start.value).length },
+            end: { line: end.line, column: end.column },
+        };
+    }
+
+    private previousSyntaxToken(): Token {
+        let index = this.pos - 1;
+        while (index > 0 && [TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT, TokenType.COMMENT].includes(this.tokens[index].type)) {
+            index--;
+        }
+        return this.tokens[index];
     }
 
     /** `ta.sma` for a callee built from identifiers only, otherwise null. */
@@ -332,6 +386,9 @@ export class Parser {
     // Main parse method
     parse() {
         const body = [];
+        this.libraryImports = [];
+        this.libraryExports = [];
+        this.importAliases = new Set();
 
         this.collectTopLevelFunctionNames();
 
@@ -352,7 +409,7 @@ export class Parser {
             this.skipNewlines();
         }
 
-        return new Program(body);
+        return new Program(body, this.libraryImports, this.libraryExports);
     }
 
     // Pine keeps functions and variables in separate namespaces, so a variable may
@@ -366,17 +423,16 @@ export class Parser {
             if (t.type === TokenType.INDENT) depth++;
             else if (t.type === TokenType.DEDENT) depth--;
             const atLineStart = i === 0 || this.tokens[i - 1].type === TokenType.NEWLINE || this.tokens[i - 1].type === TokenType.DEDENT;
-            if (depth === 0 && t.type === TokenType.KEYWORD && t.value === 'type' && i + 1 < this.tokens.length) {
-                const prev = this.tokens[i - 1];
-                if (atLineStart || (prev?.type === TokenType.KEYWORD && prev.value === 'export')) {
-                    this.typeNames.add(this.tokens[i + 1].value);
-                }
+            if (depth !== 0 || !atLineStart) continue;
+            const declarationOffset = t.type === TokenType.KEYWORD && t.value === 'export' ? 1 : 0;
+            const declaration = this.tokens[i + declarationOffset];
+            if (declaration?.type === TokenType.KEYWORD && declaration.value === 'type' && i + declarationOffset + 1 < this.tokens.length) {
+                this.typeNames.add(this.tokens[i + declarationOffset + 1].value);
             }
-            if (depth !== 0 || !atLineStart || t.type !== TokenType.IDENTIFIER) continue;
-            this.pos = i;
+            if (declaration?.type !== TokenType.IDENTIFIER) continue;
+            this.pos = i + declarationOffset;
             if (!this.isFunctionDeclaration()) continue;
-            const hasReturnType = this.peek(1).type !== TokenType.LPAREN;
-            this.functionNames.add(this.peek(hasReturnType ? 1 : 0).value);
+            this.functionNames.add(this.peek(this.functionNameOffset()).value);
         }
         this.pos = 0;
 
@@ -392,6 +448,29 @@ export class Parser {
                 this.typeVariableNames.add(t.value);
             }
         }
+    }
+
+    private functionNameOffset(): number {
+        let offset = 0;
+        if (this.peek(offset).type !== TokenType.IDENTIFIER) return offset;
+
+        offset++;
+        while (this.peek(offset).type === TokenType.DOT && this.peek(offset + 1).type === TokenType.IDENTIFIER) {
+            offset += 2;
+        }
+        if (this.peek(offset).type === TokenType.LBRACKET && this.peek(offset + 1).type === TokenType.RBRACKET) {
+            offset += 2;
+        } else if (this.peek(offset).type === TokenType.OPERATOR && this.peek(offset).value === '<') {
+            let depth = 1;
+            offset++;
+            while (depth > 0 && this.peek(offset).type !== TokenType.EOF) {
+                if (this.peek(offset).type === TokenType.OPERATOR && this.peek(offset).value === '<') depth++;
+                else if (this.peek(offset).type === TokenType.OPERATOR && this.peek(offset).value === '>') depth--;
+                offset++;
+            }
+        }
+
+        return this.isNameSlot(this.peek(offset)) && this.peek(offset + 1).type === TokenType.LPAREN ? offset : 0;
     }
 
     // A declared variable that shares its name with a user function or type is renamed.
@@ -428,6 +507,111 @@ export class Parser {
         }
         while (this.peek(i).type === TokenType.NEWLINE || this.peek(i).type === TokenType.COMMENT) i++;
         return this.peek(i).type === TokenType.INDENT;
+    }
+
+    private parseImportIdentifier(part: string): Token {
+        const token = this.peek();
+        if (token.type !== TokenType.IDENTIFIER) {
+            throw new Error(`Invalid library import: expected ${part} at ${this.startOf(token)}`);
+        }
+        return this.advance();
+    }
+
+    private expectImportSlash(after: string): void {
+        const token = this.peek();
+        if (token.type !== TokenType.OPERATOR || token.value !== '/') {
+            throw new Error(`Invalid library import path: expected "/" after ${after} at ${this.startOf(token)}`);
+        }
+        this.advance();
+    }
+
+    private parseImportDeclaration(): ImportDeclaration {
+        const start = this.expect(TokenType.KEYWORD, 'import');
+        if (start.indent !== 0) {
+            throw new Error(`Library imports must be top-level at ${this.startOf(start)}`);
+        }
+
+        const user = this.parseImportIdentifier('user');
+        this.expectImportSlash('user');
+        const name = this.parseImportIdentifier('library name');
+        this.expectImportSlash('library name');
+
+        const version = this.peek();
+        if (version.type !== TokenType.NUMBER || !/^\d+$/.test(version.raw ?? '') || version.value < 1) {
+            throw new Error(`Invalid library version at ${this.startOf(version)}: expected a positive integer`);
+        }
+        this.advance();
+
+        if (!this.match(TokenType.KEYWORD, 'as')) {
+            throw new Error(`Library import alias is required after version at ${version.line}:${version.column}`);
+        }
+        this.advance();
+        const alias = this.expectName();
+        if (this.importAliases.has(alias.value)) {
+            throw new Error(`Duplicate library import alias "${alias.value}" at ${this.startOf(alias)}`);
+        }
+        this.importAliases.add(alias.value);
+
+        const declaration = new ImportDeclaration({
+            user: user.value,
+            name: name.value,
+            version: version.value,
+            alias: alias.value,
+            sourceSpan: this.sourceSpan(start, alias),
+        });
+        this.libraryImports.push(declaration);
+        return declaration;
+    }
+
+    private parseExportDeclaration() {
+        const start = this.expect(TokenType.KEYWORD, 'export');
+        if (start.indent !== 0) {
+            throw new Error(`Library exports must be top-level at ${this.startOf(start)}`);
+        }
+
+        let declaration;
+        let exportKind: LibraryExportKind;
+        let names: string[];
+        if (this.match(TokenType.KEYWORD, 'type')) {
+            declaration = this.parseTypeDefinition();
+            exportKind = 'type';
+            names = [declaration.name];
+        } else if (this.match(TokenType.KEYWORD, 'enum')) {
+            const name = this.peek(1).value;
+            declaration = this.parseEnumDefinition();
+            exportKind = 'enum';
+            names = [name];
+        } else if (this.match(TokenType.KEYWORD, 'method')) {
+            declaration = this.parseMethodDeclaration();
+            exportKind = 'function';
+            names = [declaration.id.name];
+        } else if (this.peek().type === TokenType.IDENTIFIER && this.isTypedVarDeclaration()) {
+            if (this.peek().value !== 'const') {
+                throw new Error(`Library variable exports must use const at ${this.startOf(this.peek())}`);
+            }
+            declaration = this.parseTypedVarDeclaration();
+            exportKind = 'const';
+            names = declaration.declarations.map((item) => item.id.name);
+        } else if (this.isFunctionDeclaration()) {
+            declaration = this.parseFunctionDeclaration();
+            exportKind = 'function';
+            names = [declaration.id.name];
+        } else {
+            throw new Error(`Invalid library export at ${this.startOf(this.peek())}: expected function, type, enum, or const declaration`);
+        }
+
+        const sourceSpan = this.sourceSpan(start, this.previousSyntaxToken());
+        declaration.exported = true;
+        declaration.sourceSpan = sourceSpan;
+        for (const name of names) {
+            this.libraryExports.push({ kind: exportKind, name, sourceSpan });
+        }
+        return declaration;
+    }
+
+    private isKeywordNameDeclaration(): boolean {
+        const next = this.peek(1);
+        return next.type === TokenType.LPAREN || (next.type === TokenType.OPERATOR && next.value === '=');
     }
 
     // `once cond` → `var bool __once_N = false` + `if not __once_N` → `if cond` → `__once_N := true` + block.
@@ -467,8 +651,13 @@ export class Parser {
 
         let stmt;
 
-        // Enum definition
-        if (this.match(TokenType.KEYWORD, 'enum')) {
+        // Library import/export declarations
+        if (this.match(TokenType.KEYWORD, 'import') && !this.isKeywordNameDeclaration()) {
+            stmt = this.parseImportDeclaration();
+        } else if (this.match(TokenType.KEYWORD, 'export') && !this.isKeywordNameDeclaration()) {
+            stmt = this.parseExportDeclaration();
+        } else if (this.match(TokenType.KEYWORD, 'enum')) {
+            // Enum definition
             stmt = this.parseEnumDefinition();
         }
         // Type definition
@@ -597,12 +786,7 @@ export class Parser {
             // A keyword in the name slot (`in(x) => x`) is accepted by the
             // lookahead so parseFunctionDeclaration can report it as a
             // reserved name rather than a generic syntax error.
-            let i = 0;
-
-            // Optional return type
-            if (this.peek(i).type === TokenType.IDENTIFIER && this.isNameSlot(this.peek(i + 1))) {
-                i++; // Skip return type
-            }
+            let i = this.functionNameOffset();
 
             // Function name
             if (!this.isNameSlot(this.peek(i))) {
@@ -757,10 +941,14 @@ export class Parser {
             const fieldName = this.expectName().value;
 
             let defaultValue = null;
+            let defaultStartToken: Token | null = null;
             if (this.match(TokenType.OPERATOR, '=')) {
                 this.advance();
                 this.skipNewlines();
+                defaultStartToken = this.peek();
                 defaultValue = this.parseExpression();
+                // CE10133: UDT field defaults are compile-time constants only.
+                this.assertTypeFieldDefault(defaultValue, defaultStartToken);
             }
 
             fields.push({ type: fieldType, name: fieldName, defaultValue });
@@ -913,6 +1101,17 @@ export class Parser {
 
         // First token must be IDENTIFIER (already checked by caller)
         if (this.peek(offset).type !== TokenType.IDENTIFIER) return false;
+
+        const qualifier = this.peek(offset);
+        if (TYPE_QUALIFIERS.has(qualifier.value)) {
+            offset++;
+            const next = this.peek(offset);
+            if (next.type === TokenType.IDENTIFIER && TYPE_QUALIFIERS.has(next.value)) {
+                throw new Error(`Duplicate type qualifier "${next.value}" at ${this.startOf(next)}`);
+            }
+            if (next.type !== TokenType.IDENTIFIER) return false;
+        }
+
         offset++;
 
         // Skip dotted type name: chart.point, line.style, etc.
@@ -921,18 +1120,11 @@ export class Parser {
         }
 
         // Check for array shorthand: type[] name =
-        // (A keyword in the name slot is accepted here and in the branches
-        // below so parseTypedVarDeclaration reports it as a reserved name.)
         if (this.peek(offset).type === TokenType.LBRACKET && this.peek(offset + 1).type === TokenType.RBRACKET) {
             offset += 2; // skip []
-            // Now expect IDENTIFIER (name) then =
-            if (!this.isNameSlot(this.peek(offset))) return false;
-            offset++;
-            return this.peek(offset).type === TokenType.OPERATOR && this.peek(offset).value === '=';
         }
-
         // Check for generic type: type<...> name =
-        if (this.peek(offset).type === TokenType.OPERATOR && this.peek(offset).value === '<') {
+        else if (this.peek(offset).type === TokenType.OPERATOR && this.peek(offset).value === '<') {
             offset++; // skip <
             let depth = 1;
             // Skip until matching >
@@ -941,26 +1133,25 @@ export class Parser {
                 else if (this.peek(offset).type === TokenType.OPERATOR && this.peek(offset).value === '>') depth--;
                 offset++;
             }
-            // Now expect IDENTIFIER (name) then =
-            if (!this.isNameSlot(this.peek(offset))) return false;
-            offset++;
-            return this.peek(offset).type === TokenType.OPERATOR && this.peek(offset).value === '=';
         }
 
-        // Check for simple typed declaration: type name = or type qualifier name =
-        if (!this.isNameSlot(this.peek(offset))) return false;
-        offset++;
-        // Skip additional type qualifiers (series float x, simple int y, etc.)
-        while (this.isNameSlot(this.peek(offset))) {
-            offset++;
+        const name = this.peek(offset);
+        if (name.type === TokenType.IDENTIFIER && TYPE_QUALIFIERS.has(name.value) && this.isNameSlot(this.peek(offset + 1))) {
+            throw new Error(`Type qualifier "${name.value}" must precede the type at ${this.startOf(name)}`);
         }
+        if (!this.isNameSlot(name)) return false;
+        offset++;
         return this.peek(offset).type === TokenType.OPERATOR && this.peek(offset).value === '=';
     }
 
     // Parse typed variable declaration (int x = ... or series float x = ...)
     // Also handles: type[] name = ..., type<generic> name = ..., ns.type[] name = ...
     parseTypedVarDeclaration() {
-        let varType = this.advance().value;
+        let varType = '';
+        if (TYPE_QUALIFIERS.has(this.peek().value)) {
+            varType = this.advance().value + ' ';
+        }
+        varType += this.advance().value;
 
         // Handle dotted type names: chart.point, line.style, etc.
         while (this.match(TokenType.DOT) && this.peek(1).type === TokenType.IDENTIFIER) {
@@ -1009,6 +1200,7 @@ export class Parser {
             }
         }
 
+        const nameToken = this.peek();
         const name = this.variableName(this.expectName().value);
 
         this.expect(TokenType.OPERATOR, '=');
@@ -1016,6 +1208,7 @@ export class Parser {
         const init = this.parseExpression();
 
         const id = new Identifier(name);
+        (id as any)._pos = this.startOf(nameToken);
         id.varType = varType;
 
         const declarators = [new VariableDeclarator(id, init, varType)];
@@ -1038,11 +1231,13 @@ export class Parser {
         ) {
             this.advance(); // consume ','
             this.skipNewlines(true);
+            const nextNameToken = this.peek();
             const nextName = this.variableName(this.expectName().value);
             this.expect(TokenType.OPERATOR, '=');
             this.skipNewlines(true);
             const nextInit = this.parseExpression();
             const nextId = new Identifier(nextName);
+            (nextId as any)._pos = this.startOf(nextNameToken);
             nextId.varType = varType;
             declarators.push(new VariableDeclarator(nextId, nextInit, varType));
         }
@@ -1053,8 +1248,8 @@ export class Parser {
     // Parse function declaration
     parseFunctionDeclaration() {
         let returnType = null;
-        if (this.peek().type === TokenType.IDENTIFIER && this.isNameSlot(this.peek(1))) {
-            returnType = this.advance().value;
+        if (this.functionNameOffset() > 0) {
+            returnType = this.parseTypeExpression();
         }
 
         const name = this.expectName().value;
@@ -1107,8 +1302,10 @@ export class Parser {
                 paramType = paramType ? paramType + ' ' + arrayType : arrayType;
             }
 
+            const paramNameToken = this.peek();
             const paramName = this.expectName().value;
             const param = new Identifier(paramName);
+            (param as any)._pos = this.startOf(paramNameToken);
             if (paramType) param.varType = paramType;
 
             // Handle default parameters
@@ -1224,8 +1421,10 @@ export class Parser {
                 paramType = paramType ? paramType + ' ' + arrayType : arrayType;
             }
 
+            const paramNameToken = this.peek();
             const paramName = this.expectName().value;
             const param = new Identifier(paramName);
+            (param as any)._pos = this.startOf(paramNameToken);
             if (paramType) param.varType = paramType;
 
             // Handle default parameters
@@ -1586,8 +1785,10 @@ export class Parser {
             isDestructuring = true;
         } else {
             // Simple identifier: for i in array or for i = 0 to 10
+            const varNameToken = this.peek();
             const varName = this.expectName().value;
             loopVar = new Identifier(varName);
+            (loopVar as any)._pos = this.startOf(varNameToken);
         }
 
         // Check if it's for-in loop (for item in array) or range loop (for i = 0 to 10)

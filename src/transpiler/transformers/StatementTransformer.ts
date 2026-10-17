@@ -350,7 +350,7 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
 
         // Transform non-context variables to use the context object
         const newName = scopeManager.addVariable(decl.id.name, varNode.kind);
-        const kind = varNode.kind; // 'const', 'let', or 'var'
+        const kind = varNode.kind; // 'const', 'let', 'var', or 'varip'
 
         // Only treat as an array pattern variable when it actually has the destructured
         // MemberExpression shape (e.g. _tmp_0[0]) from the AnalysisPass rewrite.
@@ -492,9 +492,22 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
                                 }
                             }
                         },
+                        VariableDeclaration(node: any, state: any, c: any) {
+                            if (node.kind === 'var' || node.kind === 'varip') {
+                                transformVariableDeclaration(node, scopeManager);
+                                return;
+                            }
+
+                            // Ordinary declarations remain lexical locals of the
+                            // generated value-IIFE, but their initializers still need lowering.
+                            node.declarations.forEach((declaration: any) => {
+                                if (declaration.init) c(declaration.init, { ...state, parent: declaration });
+                            });
+                        },
                         ArrowFunctionExpression(node: any, state: any, c: any) {
                             // For IIFE arrow functions, manage hoisting like BlockStatement does
                             // This prevents hoisted statements from escaping to the outer scope
+                            scopeManager.pushScope('if');
                             if (node.body) {
                                 if (node.body.type === 'BlockStatement') {
                                     // Process each statement with its own hoisting scope
@@ -512,9 +525,11 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
                                     c(node.body, { parent: node, insideIIFE: true });
                                 }
                             }
+                            scopeManager.popScope();
                         },
                         FunctionExpression(node: any, state: any, c: any) {
                             // For IIFE function expressions, manage hoisting like BlockStatement does
+                            scopeManager.pushScope('if');
                             if (node.body && node.body.type === 'BlockStatement') {
                                 const newBody: any[] = [];
                                 node.body.body.forEach((stmt: any) => {
@@ -526,6 +541,7 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
                                 });
                                 node.body.body = newBody;
                             }
+                            scopeManager.popScope();
                         },
                         BlockStatement(node: any, state: any, c: any) {
                             // Nested blocks inside an IIFE (the `if`/`else` bodies that a Pine
@@ -535,6 +551,7 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
                             // walkers. Without it, `if (c) { return array.get(a, 0) }` hoists the
                             // `array.get` temp to the IIFE body, ahead of the `if`, so the untaken
                             // branch is evaluated anyway (and throws on an empty array).
+                            scopeManager.pushScope('if');
                             const newBody: any[] = [];
                             node.body.forEach((stmt: any) => {
                                 scopeManager.enterHoistingScope();
@@ -544,12 +561,13 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
                                 newBody.push(stmt);
                             });
                             node.body = newBody;
+                            scopeManager.popScope();
                         },
                         SwitchStatement(node: any, state: any, c: any) {
                             // Traverse discriminant and all cases
                             if (node.discriminant) {
                                 node.discriminant.parent = node;
-                                c(node.discriminant, { parent: node });
+                                c(node.discriminant, { ...state, parent: node });
                             }
                             if (node.cases) {
                                 node.cases.forEach((caseNode: any) => {
@@ -559,7 +577,7 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
                                     // the IIFE and must still be rewritten to `$.set(...)`. Dropping
                                     // the flag here left them as bare `name = …`, which leaks a host
                                     // global instead of updating the Pine variable.
-                                    c(caseNode, { parent: node, insideIIFE: state.insideIIFE });
+                                    c(caseNode, { ...state, parent: node });
                                 });
                             }
                         },
@@ -567,7 +585,7 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
                             // Traverse test (the case value)
                             if (node.test) {
                                 node.test.parent = node;
-                                c(node.test, { parent: node, insideIIFE: state.insideIIFE });
+                                c(node.test, { ...state, parent: node });
                             }
                             // Traverse all consequent statements with hoisting management
                             if (node.consequent) {
@@ -575,7 +593,7 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
                                 node.consequent.forEach((stmt: any) => {
                                     scopeManager.enterHoistingScope();
                                     stmt.parent = node;
-                                    c(stmt, { parent: node, insideIIFE: state.insideIIFE });
+                                    c(stmt, { ...state, parent: node });
                                     const hoistedStmts = scopeManager.exitHoistingScope();
                                     newConsequent.push(...hoistedStmts);
                                     newConsequent.push(stmt);
@@ -629,7 +647,7 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
         // functions so they are only evaluated on bar 0 (deferred via initVar thunk).
         // This prevents side effects (e.g. line.new() creating orphan objects) from
         // firing on every bar when the result is discarded by initVar on bars 1+.
-        if (kind === 'var') {
+        if (kind === 'var' || kind === 'varip') {
             const hoistingScope = scopeManager.getCurrentHoistingScope();
             if (hoistingScope) {
                 for (const stmt of hoistingScope) {
@@ -676,7 +694,7 @@ export function transformVariableDeclaration(varNode: any, scopeManager: ScopeMa
         if (decl.init) {
             if (isArrowFunction || isArrayPatternVar) {
                 rightSide = decl.init;
-            } else if (kind === 'var') {
+            } else if (kind === 'var' || kind === 'varip') {
                 rightSide = ASTFactory.createInitVarCall(targetVarRef, decl.init);
             } else if (decl._tupleArity !== undefined) {
                 const toTuple = ASTFactory.createCallExpression(
@@ -1167,14 +1185,14 @@ function isContextCall(node: any): boolean {
     return node.callee?.type === 'MemberExpression' && node.callee.object?.type === 'Identifier' && node.callee.object.name === CONTEXT_NAME;
 }
 
-/** An already-scoped variable reference: `$.const.x`, `$.let.x`, `$.var.x`, `$.params.x`. */
+/** An already-scoped variable reference such as `$.const.x`, `$.var.x`, or `$.varip.x`. */
 function isContextVariableRef(node: any): boolean {
     const obj = node.object;
     return (
         obj?.type === 'MemberExpression' &&
         obj.object?.type === 'Identifier' &&
         obj.object.name === CONTEXT_NAME &&
-        ['const', 'let', 'var', 'params'].includes(obj.property?.name)
+        ['const', 'let', 'var', 'varip', 'params'].includes(obj.property?.name)
     );
 }
 
@@ -1188,6 +1206,13 @@ export function transformReturnStatement(node: any, scopeManager: ScopeManager):
                 if (element.type === 'Identifier') {
                     // Skip transformation if it's a context-bound variable
                     if (scopeManager.isContextBound(element.name) && !scopeManager.isRootParam(element.name)) {
+                        if (NAMESPACES_LIKE.includes(element.name) && element.name !== 'na') {
+                            const valueExpr = ASTFactory.createMemberExpression(
+                                ASTFactory.createIdentifier(element.name),
+                                ASTFactory.createIdentifier('__value'),
+                            );
+                            return ASTFactory.createGetCall(valueExpr, 0);
+                        }
                         // Use $.get(element, 0) instead of element[0] for context-bound variables
                         return ASTFactory.createGetCall(element, 0);
                     }
@@ -1308,6 +1333,12 @@ export function transformReturnStatement(node: any, scopeManager: ScopeManager):
                 addArrayAccess(node.argument, scopeManager);
             }
         } else if (node.argument.type === 'MemberExpression') {
+            if (
+                !node.argument.computed &&
+                (node.argument.object.type === 'CallExpression' || node.argument.object.type === 'MemberExpression')
+            ) {
+                transformExpression(node.argument, scopeManager);
+            }
             // Handle non-context-bound member expressions (e.g. return Signal.Buy)
             // where the object is a user-defined variable (enum, struct, etc.)
             //

@@ -13,7 +13,7 @@ With PineTS, you can create, test and visualize technical indicators using moder
 
 <div class="cta-container" style="text-align: center; margin: 2rem 0;">
   <a href="getting-started/" class="btn btn-primary fs-5 mb-4 mb-md-0 mr-2">Get Started →</a>
-  <a href="https://github.com/LuxAlgo/PineTS" class="btn btn-outline fs-5 mb-4 mb-md-0">View on GitHub</a>
+  <a href="https://github.com/nfwyst/PineTS" class="btn btn-outline fs-5 mb-4 mb-md-0">View on GitHub</a>
 </div>
 
 ---

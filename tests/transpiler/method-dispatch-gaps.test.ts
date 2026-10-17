@@ -148,6 +148,74 @@ plot(close)`);
         expect(logs).toEqual(['ok 2']);
     });
 
+    it('direct iterator over na drawing elements keeps getters, setters, and delete safe', async () => {
+        const logs = await runLogs(`
+var array<label> labels = array.new<label>(2)
+labelCount() =>
+    n = 0
+    for item in label.all
+        n += 1
+    n
+if barstate.islast
+    labels.set(1, label.new(bar_index, close, "before"))
+    missing = 0
+    for item in labels
+        x = item.get_x()
+        if na(x)
+            missing += 1
+        item.set_text("after")
+        if not na(x)
+            log.info("real " + item.get_text())
+        item.delete()
+    log.info("missing " + str.tostring(missing))
+    log.info("remaining " + str.tostring(labelCount()))
+plot(close)`);
+
+        expect(logs).toEqual(['real after', 'missing 1', 'remaining 0']);
+    });
+
+    it('UDF iterator over na drawing elements preserves na and mutates real drawings', async () => {
+        const logs = await runLogs(`
+touch(line item) =>
+    item.set_x1(7)
+    x = item.get_x1()
+    item.delete()
+    x
+var array<line> lines = array.new<line>(2)
+lineCount() =>
+    n = 0
+    for item in line.all
+        n += 1
+    n
+if barstate.islast
+    lines.set(1, line.new(bar_index - 1, low, bar_index, high))
+    missing = 0
+    realX = na
+    for item in lines
+        x = touch(item)
+        if na(x)
+            missing += 1
+        else
+            realX := x
+    log.info("missing " + str.tostring(missing))
+    log.info("real " + str.tostring(realX))
+    log.info("remaining " + str.tostring(lineCount()))
+plot(close)`);
+
+        expect(logs).toEqual(['missing 1', 'real 7', 'remaining 0']);
+    });
+
+    it('non-drawing iterator method TypeErrors are not swallowed', async () => {
+        await expect(
+            runLogs(`
+var array<float> values = array.new<float>(1)
+if barstate.islast
+    for value in values
+        value.missing()
+plot(close)`),
+        ).rejects.toThrow(/value\.missing is not a function/);
+    });
+
     it('.delete() on the result of a user method that returns nothing (na) is a no-op', async () => {
         // `addLabel` pops (and returns) a label only from the second call on; the other calls return na.
         const logs = await runLogs(`

@@ -48,13 +48,12 @@ export class ChartHelper {
         return Series.from(source).get(index);
     }
 
-    //FIXME : The values below are hardcoded to match the Pine Script default values, we need to implement a better way to handle chart data
     bg_color(): string {
-        return '#1e293b';
+        return this.context.hostOptions.chartTheme.background;
     }
 
     fg_color(): string {
-        return '#d1d4dc';
+        return this.context.hostOptions.chartTheme.foreground;
     }
 
     is_standard(): boolean {

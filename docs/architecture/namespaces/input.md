@@ -44,5 +44,5 @@ Functions like `input.int`, `input.float`, `input.bool` perform validation or ca
 To regenerate the `input.index.ts` file:
 
 ```bash
-npm run generate:input-index
+bun run generate:input-index
 ```

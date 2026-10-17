@@ -5,7 +5,7 @@ import { Provider } from '@pinets/marketData/Provider.class';
 
 describe('Indicators', () => {
     it('pine_supertrend', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '240', 1000);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', '240', 1000);
 
         const { result, plots } = await pineTS.run((context) => {
             const ta = context.ta;

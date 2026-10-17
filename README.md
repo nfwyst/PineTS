@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://www.luxalgo.com"><img src="https://img.shields.io/badge/Backed_by-LuxAlgo-4185DD.svg?style=flat-square" alt="Backed by LuxAlgo"></a>
-  <a href="https://www.npmjs.com/package/pinets"><img src="https://img.shields.io/npm/v/pinets.svg?style=flat-square" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@nfwyst/pinets"><img src="https://img.shields.io/npm/v/%40nfwyst%2Fpinets.svg?style=flat-square" alt="npm version"></a>
   <a href="#license"><img src="https://img.shields.io/badge/License-AGPL--3.0%20%2F%20Commercial-blue.svg?style=flat-square" alt="License"></a>
   <a href="./.github/badges/coverage.svg"><img src="./.github/badges/coverage.svg" alt="Coverage"></a>
   <a href="#api-coverage"><img src="./.github/badges/api-coverage.svg" alt="API Coverage"></a>
@@ -38,7 +38,7 @@ You write the indicator once. PineTS runs it on your data, in your process.
 **[Documentation](https://docs.luxalgo.com/developers/pinets)**
 
 ```javascript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '1h', 100);
 
@@ -77,7 +77,7 @@ Pine Script® is built for the chart. PineTS is built for everything around it.
 ### Installation
 
 ```bash
-npm install pinets
+bun add @nfwyst/pinets
 ```
 
 
@@ -87,7 +87,7 @@ npm install pinets
 A minimal example:
 
 ```javascript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 // Initialize with Binance data
 const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '1h', 100);
@@ -159,7 +159,7 @@ plot(sma, 'Signal');
 Pass Pine Script® source to `pineTS.run()` and read the calculated series from `plots`:
 
 ```javascript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 200);
 
@@ -186,7 +186,7 @@ console.log('Signal Line:', plots['Signal'].data);
 The same indicators can be written as a JavaScript function using `$.data` and `$.pine`:
 
 ```javascript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 const pineTS = new PineTS(Provider.Binance, 'ETHUSDT', '4h', 100);
 
@@ -220,7 +220,7 @@ const { plots } = await pineTS.run(($) => {
 `pineTS.stream()` recalculates on new bars and emits plot updates:
 
 ```javascript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '1m');
 
@@ -251,7 +251,7 @@ stream.on('error', (err) => console.error('Stream error:', err));
 You can also pass your own OHLCV array instead of a market data provider:
 
 ```javascript
-import { PineTS } from 'pinets';
+import { PineTS } from '@nfwyst/pinets';
 
 // Your own OHLCV data
 const candles = [
@@ -268,6 +268,8 @@ indicator("Custom Data")
 plot(ta.sma(close, 10))
 `);
 ```
+
+An array contains only one symbol and timeframe. Pass both when constructing PineTS (for example, `new PineTS(candles, 'AAPL', 'D')`) to populate deterministic `syminfo` defaults; the default timezone is `UTC`, the session is `24x7`, and the default tick size is `0.01`. With an array source, `request.security()` and `request.security_lower_tf()` can reuse the chart's own symbol and timeframe (including empty-string defaults), but requesting another symbol or timeframe requires a market data provider and throws a clear error. PineTS does not implicitly resample array data.
 
 
 
@@ -343,8 +345,10 @@ Full guides live at **[docs.luxalgo.com/developers/pinets](https://docs.luxalgo.
 </p>
 
 ```bash
-npm install @luxalgo/vela-pinets @luxalgo/vela pinets
+bun add @luxalgo/vela-pinets @luxalgo/vela pinets@npm:@nfwyst/pinets@latest
 ```
+
+The npm alias is required because `@luxalgo/vela-pinets` imports its PineTS peer through the bare `pinets` package name. The explicit `latest` tag is required by Bun for a scoped alias, and keeps that import on this fork instead of installing the upstream package alongside it.
 
 ```javascript
 import { Vela } from '@luxalgo/vela';
@@ -367,10 +371,10 @@ Use `PineWorkerEngine` instead of `PineEngine` when a heavy script should not bl
 
 ## Use with AI agents
 
-[pinets-cli](https://github.com/LuxAlgo/pinets-cli) runs Pine Script® files from the command line with PineTS. The script goes in as a file or on stdin and the plots come out as JSON, so an agent can call it as a tool without a wrapper. Its repository includes skills for Claude Code, OpenAI Codex, and OpenClaw; see its [AI agents guide](https://github.com/LuxAlgo/pinets-cli#use-with-ai-agents).
+[pinets-cli](https://github.com/nfwyst/pinets-cli) runs Pine Script® files from the command line with PineTS. The script goes in as a file or on stdin and the plots come out as JSON, so an agent can call it as a tool without a wrapper. Its repository includes skills for Claude Code, OpenAI Codex, and OpenClaw; see its [AI agents guide](https://github.com/nfwyst/pinets-cli#use-with-ai-agents).
 
 ```bash
-npx pinets-cli run rsi.pine --symbol BTCUSDT --timeframe 60 --quiet
+bunx @nfwyst/pinets-cli run rsi.pine --symbol BTCUSDT --timeframe 60 --quiet
 ```
 
 

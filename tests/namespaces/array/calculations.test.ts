@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Context, PineTS, Provider } from 'index';
+import { normalizeNumericGraph, normalizePlotString } from '../../utils';
 
 describe('Array Calculations & Statistics', () => {
     it('AVG, VARIANCE', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'W', 500, 0, new Date('Jan 20 2025').getTime() - 1);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDT', 'W', 500, 0, new Date('Jan 20 2025').getTime() - 1);
 
         const { result } = await pineTS.run((context) => {
             const array = context.array;
@@ -31,14 +32,14 @@ describe('Array Calculations & Statistics', () => {
         const expected_variance = [1024803322.8804907, 892005824.9523604, 965593357.8452101, 876829977.664, 904158891.6052902];
         const expected_variance_biased = [922322990.5924416, 802805242.4571244, 869034022.0606892, 789146979.8976, 813743002.4447612];
 
-        expect(part_avg).toEqual(expected_avg);
+        expect(normalizeNumericGraph(part_avg)).toEqual(normalizeNumericGraph(expected_avg));
         // Values around 1e9 carry float noise in their last digit; compare to 2 decimals (~5e-12 relative).
         part_variance.forEach((v, i) => expect(v).toBeCloseTo(expected_variance[i], 2));
         part_variance_biased.forEach((v, i) => expect(v).toBeCloseTo(expected_variance_biased[i], 2));
     });
 
     it('AVG, VARIANCE from Array Object', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'W', 500, 0, new Date('Jan 20 2025').getTime() - 1);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDT', 'W', 500, 0, new Date('Jan 20 2025').getTime() - 1);
 
         const { result } = await pineTS.run((context) => {
             const array = context.array;
@@ -66,7 +67,7 @@ describe('Array Calculations & Statistics', () => {
         const expected_variance = [1024803322.8804907, 892005824.9523604, 965593357.8452101, 876829977.664, 904158891.6052902];
         const expected_variance_biased = [922322990.5924416, 802805242.4571244, 869034022.0606892, 789146979.8976, 813743002.4447612];
 
-        expect(part_avg).toEqual(expected_avg);
+        expect(normalizeNumericGraph(part_avg)).toEqual(normalizeNumericGraph(expected_avg));
         // Values around 1e9 carry float noise in their last digit; compare to 2 decimals (~5e-12 relative).
         part_variance.forEach((v, i) => expect(v).toBeCloseTo(expected_variance[i], 2));
         part_variance_biased.forEach((v, i) => expect(v).toBeCloseTo(expected_variance_biased[i], 2));
@@ -111,9 +112,9 @@ describe('Array Calculations & Statistics', () => {
             1549.624, 1597.648, 2037.32, 2025.024, 2079.2,
         ];
 
-        expect(part_sum).toEqual(expected_sum);
-        expect(part_stdev).toEqual(expected_stdev);
-        expect(part_stdev_biased).toEqual(expected_stdev_biased);
+        expect(normalizeNumericGraph(part_sum)).toEqual(normalizeNumericGraph(expected_sum));
+        expect(normalizeNumericGraph(part_stdev)).toEqual(normalizeNumericGraph(expected_stdev));
+        expect(normalizeNumericGraph(part_stdev_biased)).toEqual(normalizeNumericGraph(expected_stdev_biased));
     });
 
     it('SUM, STDEV from Array Object', async () => {
@@ -155,9 +156,9 @@ describe('Array Calculations & Statistics', () => {
             1549.624, 1597.648, 2037.32, 2025.024, 2079.2,
         ];
 
-        expect(part_sum).toEqual(expected_sum);
-        expect(part_stdev).toEqual(expected_stdev);
-        expect(part_stdev_biased).toEqual(expected_stdev_biased);
+        expect(normalizeNumericGraph(part_sum)).toEqual(normalizeNumericGraph(expected_sum));
+        expect(normalizeNumericGraph(part_stdev)).toEqual(normalizeNumericGraph(expected_stdev));
+        expect(normalizeNumericGraph(part_stdev_biased)).toEqual(normalizeNumericGraph(expected_stdev_biased));
     });
 
     it('MEDIAN, MODE, STANDARDIZE', async () => {
@@ -214,7 +215,7 @@ describe('Array Calculations & Statistics', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('STDEV', async () => {
@@ -269,7 +270,7 @@ describe('Array Calculations & Statistics', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
     it('AVG', async () => {
         const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, new Date('2018-12-10').getTime(), new Date('2019-04-20').getTime());
@@ -323,7 +324,7 @@ describe('Array Calculations & Statistics', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('VARIANCE', async () => {
@@ -380,7 +381,7 @@ describe('Array Calculations & Statistics', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('COVARIANCE', async () => {
@@ -440,7 +441,7 @@ describe('Array Calculations & Statistics', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('RANGE', async () => {
@@ -495,7 +496,7 @@ describe('Array Calculations & Statistics', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('percentrank', async () => {
@@ -550,7 +551,7 @@ describe('Array Calculations & Statistics', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('percentile_linear_interpolation', async () => {
@@ -605,7 +606,7 @@ describe('Array Calculations & Statistics', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('percentile_nearest_rank', async () => {
@@ -660,6 +661,6 @@ describe('Array Calculations & Statistics', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });

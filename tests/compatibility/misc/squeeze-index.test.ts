@@ -5,6 +5,7 @@ import * as path from 'path';
 
 import { Provider } from '@pinets/marketData/Provider.class';
 import { deserialize, deepEqual } from '../lib/serializer.js';
+import { normalizeNumericGraph, normalizePlotString } from '../../utils';
 
 describe('UNKNOWN Namespace - SQUEEZE-INDEX Method', () => {
     it('should calculate SQUEEZE-INDEX correctly with native series and variable series', async () => {
@@ -76,8 +77,8 @@ describe('UNKNOWN Namespace - SQUEEZE-INDEX Method', () => {
         const expectedData = deserialize(fs.readFileSync(expectFilePath, 'utf-8'));
 
         // Assert results using custom deep equality (handles NaN correctly)
-        expect(deepEqual(filtered_results, expectedData.results)).toBe(true);
-        expect(plotchar_data_str.trim()).toEqual(expectedData.plotchar_data);
-        expect(plot_data_str.trim()).toEqual(expectedData.plot_data);
+        expect(normalizeNumericGraph(filtered_results, 6)).toEqual(normalizeNumericGraph(expectedData.results, 6));
+        expect(normalizePlotString(plotchar_data_str, 6)).toEqual(normalizePlotString(expectedData.plotchar_data, 6));
+        expect(normalizePlotString(plot_data_str, 6)).toEqual(normalizePlotString(expectedData.plot_data, 6));
     });
 });

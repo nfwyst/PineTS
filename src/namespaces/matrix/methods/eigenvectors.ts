@@ -2,17 +2,16 @@
 
 import { PineMatrixObject } from '../PineMatrixObject';
 import { Context } from '../../../Context.class';
+import { decomposeEigen } from '../eigen';
 
-// Placeholder for eigenvector calculation
 export function eigenvectors(context: Context) {
     return (id: PineMatrixObject) => {
         const rows = id.matrix.length;
         const cols = rows > 0 ? id.matrix[0].length : 0;
         if (rows !== cols) return new PineMatrixObject(0, 0, NaN, context);
 
-        // Return identity for now as placeholder or simple 2x2 logic
         const newMatrix = new PineMatrixObject(rows, cols, 0, context);
-        for (let i = 0; i < rows; i++) newMatrix.matrix[i][i] = 1;
+        newMatrix.matrix = decomposeEigen(id.matrix).vectors;
         return newMatrix;
     };
 }

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { PineTS } from '../../../PineTS.class';
+import type { PineTS } from '../../../PineTS.class';
 import { Series } from '../../../Series';
 import { formatTimeframe, parseTimeframe, timeframeSeconds } from '../../../timeframe';
-import { plainTickerId } from '../../../tickerModifier';
+import { plainTickerId, splitTickerModifier } from '../../../tickerModifier';
 import { PineArrayObject, PineArrayType } from '../../array/PineArrayObject';
 import { PineTypeObject } from '../../PineTypeObject';
-import { parseArgsForPineParams } from '../../utils';
+import { isNamedArgsBag, parseArgsForPineParams } from '../../utils';
 import { trackRequestContext, MAX_CALC_BARS } from '../../limits';
+import { runSecondary } from '../utils/runSecondary';
 
 // Pine signature (v5/v6):
 //   request.security_lower_tf(symbol, timeframe, expression, ignore_invalid_symbol, currency, ignore_invalid_timeframe, calc_bars_count)
@@ -33,14 +34,18 @@ function isParamTuple(v: any): v is [any, string] {
     return Array.isArray(v) && v.length === 2 && typeof v[1] === 'string';
 }
 
+// The trailing named-arguments bag also arrives wrapped in a param tuple, but
+// its [1] is the bag wrapper name, not an expression the secondary records;
+// unwrap it to a plain object so a real Pine tuple expression (e.g.
+// `[close > open, syminfo.ticker]`) is never confused with the bag.
 function unwrapParamTuples(rawArgs: any[], outNames: (string | undefined)[]): any[] {
     return rawArgs.map((a) => {
-        if (isParamTuple(a)) {
+        if (isParamTuple(a) && !isNamedArgsBag(a[0])) {
             outNames.push(a[1]);
             return a[0];
         }
         outNames.push(undefined);
-        return a;
+        return isParamTuple(a) ? a[0] : a;
     });
 }
 
@@ -185,12 +190,12 @@ function detectPureBuiltinExpression(originalSource: any, context: any): Builtin
 }
 
 /**
- * Fast path: build a minimal "secondary context" object whose shape
+ * Fast path: build a minimal "secondary context" object from an already
+ * loaded PineTS instance. Its shape
  * matches the subset of fields the downstream LTF aggregation reads —
  * `data.openTime.data`, `data.closeTime.data`, and
- * `params[expression_name]`. No PineTS instance is created and no user
- * script ever runs in the secondary; we just open the LTF candle stream
- * and shred each candle into its requested builtin field(s).
+ * `params[expression_name]`. No user script runs in the secondary; the
+ * loaded LTF candles are shredded into their requested builtin fields.
  *
  * The shape of `values[i]` (each LTF bar's contribution to the
  * captured expression) follows the descriptor:
@@ -202,30 +207,12 @@ function detectPureBuiltinExpression(originalSource: any, context: any): Builtin
  *                with builtin defaults resolved against the secondary's
  *                `context.data`).
  */
-async function buildFastBuiltinSecContext(
+function buildFastBuiltinSecContext(
     context: any,
-    _symbol: string,
-    _timeframe: string,
-    _calc_bars_count: number | undefined,
+    pineTS: PineTS,
     expr: BuiltinExpr,
     expressionName: string,
 ) {
-    const effectiveSDate = context.sDate
-        || (context.marketData?.length > 0 ? context.marketData[0].openTime : undefined);
-    const lastBarCloseTime = context.marketData?.length > 0
-        ? context.marketData[context.marketData.length - 1].closeTime
-        : 0;
-    const secEDate = lastBarCloseTime || context.eDate || Date.now();
-
-    // Reuse PineTS's data-loading path so we get exactly the same
-    // candle stream a slow-path secondary would have used (provider,
-    // pagination semantics, syminfo). Wait for `ready()` and read the
-    // populated arrays — never call `run()`, so no transpile, no
-    // iteration, no shifts, no helpers.
-    const pineTS = new PineTS(context.source, _symbol, _timeframe, _calc_bars_count, effectiveSDate, secEDate);
-    pineTS.markAsSecondary();
-    await pineTS.ready();
-
     // Use the openTime/closeTime arrays already prepared by the
     // PineTS instance — these have the closeTime fallback (openTime +
     // timeframe duration) applied for providers that omit closeTime.
@@ -289,6 +276,9 @@ export function security_lower_tf(context: any) {
         const expressionSlot = resolveSlotValue(parsed.expression);
 
         const rawSymbol = symbolSlot instanceof Series ? symbolSlot.get(0) : symbolSlot;
+        const chartTicker = typeof context.tickerId === 'string' && context.tickerId.includes(':') ? context.tickerId.split(':')[1] : context.tickerId;
+        const chartParts = typeof chartTicker === 'string' ? splitTickerModifier(chartTicker) : { symbol: chartTicker, modifier: null };
+        const chartModifier = chartParts.modifier === 'standard' ? null : chartParts.modifier;
         // Empty string "" means "use chart's symbol" (Pine Script spec) — i.e. the chart's own
         // ticker. THE CHART TYPE IS THE TICKER: on a non-standard chart it already carries the
         // ";heikinashi" modifier, which rides through to the data source (PineTS' own providers
@@ -297,12 +287,31 @@ export function security_lower_tf(context: any) {
         // as its symbol.
         const resolvedSymbol = plainTickerId(rawSymbol === '' ? context.tickerId : rawSymbol);
         const _symbol = typeof resolvedSymbol === 'string' && resolvedSymbol.includes(':') ? resolvedSymbol.split(':')[1] : resolvedSymbol;
+        const requestedParts = typeof _symbol === 'string' ? splitTickerModifier(_symbol) : { symbol: _symbol, modifier: null };
+        const requestedModifier = requestedParts.modifier === 'standard' ? null : requestedParts.modifier;
+        const isSameSymbol = !_symbol || _symbol === '' || (requestedParts.symbol === chartParts.symbol && requestedModifier === chartModifier);
         const rawTimeframe = timeframeSlot instanceof Series ? timeframeSlot.get(0) : timeframeSlot;
         // Empty string "" means "use chart's timeframe" (Pine Script spec)
         const _timeframe = rawTimeframe === '' ? context.timeframe : (typeof rawTimeframe === 'string' ? rawTimeframe : String(rawTimeframe ?? ''));
         const _expression = expressionSlot;
         const _expression_name = resolveSlotName('expression', SECURITY_LOWER_TF_SIGNATURES, argNames, parsed.expression);
-        const _ignore_invalid_symbol = resolveSlotValue(parsed.ignore_invalid_symbol);
+        const recordedShape = context._requestParamShapes?.[_expression_name];
+        const tupleArity = recordedShape === undefined
+            ? (Array.isArray(_expression) ? _expression.length : undefined)
+            : (recordedShape.kind === 'tuple' ? recordedShape.arity : undefined);
+        const expressionTypes = Array.isArray(_expression)
+            ? _expression.map(detectArrayType)
+            : [detectArrayType(_expression)];
+        const emptyExpressionResult = () => {
+            if (tupleArity !== undefined) {
+                return [Array.from(
+                    { length: tupleArity },
+                    (_, index) => new PineArrayObject([], expressionTypes[index] ?? PineArrayType.any, context),
+                )];
+            }
+            return new PineArrayObject([], expressionTypes[0] ?? PineArrayType.any, context);
+        };
+        const _ignore_invalid_symbol = resolveSlotValue(parsed.ignore_invalid_symbol) === true;
         const _ignore_invalid_timeframe = resolveSlotValue(parsed.ignore_invalid_timeframe);
         const _calc_bars_count = (() => {
             const v = resolveSlotValue(parsed.calc_bars_count);
@@ -326,18 +335,25 @@ export function security_lower_tf(context: any) {
         const reqTimeframe = parseTimeframe(_timeframe);
 
         if (!ctxTimeframe || !reqTimeframe) {
-            if (_ignore_invalid_timeframe) return NaN;
             throw new Error(`Invalid value of the 'timeframe' argument ('${reqTimeframe ? context.timeframe : _timeframe}') in the 'security_lower_tf' function.`);
         }
         const ctxSeconds = timeframeSeconds(ctxTimeframe);
         const reqSeconds = timeframeSeconds(reqTimeframe);
 
         if (reqSeconds > ctxSeconds) {
-            if (_ignore_invalid_timeframe) return NaN;
+            if (_ignore_invalid_timeframe) return emptyExpressionResult();
             throw new Error(`Timeframe ${_timeframe} is not lower than or equal to chart timeframe ${context.timeframe}`);
         }
 
-        if (formatTimeframe(reqTimeframe) === formatTimeframe(ctxTimeframe)) {
+        const isSameTimeframe = formatTimeframe(reqTimeframe) === formatTimeframe(ctxTimeframe);
+        if (Array.isArray(context.source) && !(isSameSymbol && isSameTimeframe)) {
+            throw new Error(
+                `request.security_lower_tf needs a market data provider to load ${_symbol || context.tickerId || 'the chart symbol'} "${_timeframe}": ` +
+                `an array data source only holds the chart's own symbol and timeframe`,
+            );
+        }
+
+        if (isSameTimeframe && isSameSymbol) {
             if (Array.isArray(_expression)) {
                 // Tuple: each element becomes a 1-element PineArrayObject
                 const arrays = _expression.map((v: any) =>
@@ -350,6 +366,34 @@ export function security_lower_tf(context: any) {
         }
 
         const cacheKey = `${_symbol}_${_timeframe}_${_expression_name}_lower`;
+        const effectiveSDate = context.sDate
+            || (context.marketData?.length > 0 ? context.marketData[0].openTime : undefined);
+        const lastBarCloseTime = context.marketData?.length > 0
+            ? context.marketData[context.marketData.length - 1].closeTime
+            : 0;
+        const secEDate = lastBarCloseTime || context.eDate || Date.now();
+        const createSecondary = () => {
+            const pineTS = context.createSecondaryPineTS(
+                context.source,
+                _symbol,
+                _timeframe,
+                _calc_bars_count,
+                effectiveSDate,
+                secEDate,
+                context.hostOptions,
+            );
+            pineTS.markAsSecondary();
+            return pineTS;
+        };
+        const handleIgnoredLoadFailure = (error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            context.cache[cacheKey] = { failed: true };
+            context.warn(
+                `request.security_lower_tf(${_symbol}, ${_timeframe}) returns an empty array: ${message}`,
+                'request.security_lower_tf',
+            );
+            return emptyExpressionResult();
+        };
 
         // Fast path: when the captured expression is a bare price/time
         // builtin Series (or a tuple of them — e.g. `[open, high, low,
@@ -368,12 +412,17 @@ export function security_lower_tf(context: any) {
             // (fast or slow path, each is a provider fetch on the host's key) so an
             // uncapped fan-out cannot drain the host operator's provider quota.
             trackRequestContext(context, 'request.security_lower_tf');
+            const pineTS = createSecondary();
+            try {
+                await pineTS.ready();
+            } catch (error: unknown) {
+                if (!_ignore_invalid_symbol) throw error;
+                return handleIgnoredLoadFailure(error);
+            }
+
             if (builtinExpr !== null) {
                 // ── Fast path ────────────────────────────────────────
-                const fastSecContext = await buildFastBuiltinSecContext(
-                    context, _symbol, _timeframe, _calc_bars_count,
-                    builtinExpr, _expression_name,
-                );
+                const fastSecContext = buildFastBuiltinSecContext(context, pineTS, builtinExpr, _expression_name);
                 context.cache[cacheKey] = {
                     pineTS: null,
                     context: fastSecContext,
@@ -393,55 +442,31 @@ export function security_lower_tf(context: any) {
                 // bars before the main loop can advance past bar 0, which
                 // manifests as a multi-minute hang on small charts (e.g.
                 // 50 bars on 5m). Use the chart's earliest openTime.
-                const effectiveSDate = context.sDate
-                    || (context.marketData?.length > 0 ? context.marketData[0].openTime : undefined);
-                const adjustedSDate = effectiveSDate;
-
-                const lastBarCloseTime = context.marketData?.length > 0
-                    ? context.marketData[context.marketData.length - 1].closeTime
-                    : 0;
-                const secEDate = lastBarCloseTime || context.eDate || Date.now();
-
-                const pineTS = new PineTS(context.source, _symbol, _timeframe, _calc_bars_count, adjustedSDate, secEDate);
-                pineTS.markAsSecondary();
-
-                // Truncated-slice slow path: when the transpiler emitted a
-                // slice for THIS call's expression name, the secondary
-                // runs the prefix-of-statements ending at the call —
-                // skipping all post-call work the slow path used to drag
-                // along. Falls back to running the FULL user script when
-                // no slice is available.
-                //
-                // For fn-nested calls (Phase 3), `request.param` runs
-                // inside a function scope and the codegen prefixes the
-                // param name with `$$.id + 'pN'` — so the runtime
-                // `_expression_name` is something like `<path>p3` whereas
-                // the slice map is keyed by the bare static `pN`. Extract
-                // the trailing `pN` for the lookup.
-                const exprNameStr = typeof _expression_name === 'string' ? _expression_name : '';
-                const sliceKey = exprNameStr.match(/p\d+$/)?.[0] ?? exprNameStr;
-                const slice = (context as any)._ltfTruncatedBodies?.[sliceKey];
-                let secContext: any;
-                if (slice) {
-                    secContext = await pineTS.runPretranspiled(slice);
-                } else {
-                    secContext = await pineTS.run(context.pineTSCode);
-                }
+                const secContext = await runSecondary(context, pineTS, _expression_name);
                 context.cache[cacheKey] = { pineTS, context: secContext, dataVersion: context.dataVersion };
             }
         }
 
         const cached = context.cache[cacheKey];
+        if (cached.failed) return emptyExpressionResult();
 
         // Refresh secondary context when main context's data has changed (streaming mode)
         if (context.dataVersion > cached.dataVersion) {
             if (cached._fastPath) {
-                // Re-fetch and rebuild the fast-path cache entry — there
-                // is no `updateTail` for fast-path entries because no
-                // PineTS instance was constructed.
-                const refreshed = await buildFastBuiltinSecContext(
-                    context, _symbol, _timeframe, _calc_bars_count,
-                    cached._fastPathArgs.builtinExpr, _expression_name,
+                // Re-fetch and rebuild the fast-path cache entry — the
+                // loading PineTS instance is not retained for updateTail().
+                const refreshedPineTS = createSecondary();
+                try {
+                    await refreshedPineTS.ready();
+                } catch (error: unknown) {
+                    if (!_ignore_invalid_symbol) throw error;
+                    return handleIgnoredLoadFailure(error);
+                }
+                const refreshed = buildFastBuiltinSecContext(
+                    context,
+                    refreshedPineTS,
+                    cached._fastPathArgs.builtinExpr,
+                    _expression_name,
                 );
                 cached.context = refreshed;
                 cached.dataVersion = context.dataVersion;
@@ -462,13 +487,7 @@ export function security_lower_tf(context: any) {
         
         // If expression was not evaluated in secondary context (e.g. conditional execution), return empty array
         if (!secValues) {
-            if (Array.isArray(_expression)) {
-                const arrays = _expression.map(() =>
-                    new PineArrayObject([], PineArrayType.float, context)
-                );
-                return [arrays];
-            }
-            return new PineArrayObject([], PineArrayType.float, context);
+            return emptyExpressionResult();
         }
 
         const result: any[] = [];
@@ -493,22 +512,22 @@ export function security_lower_tf(context: any) {
             }
         }
 
-        // Detect if expression is a tuple (each bar value is an array)
-        const isTuple = result.length > 0 && Array.isArray(result[0]);
-
-        if (isTuple) {
+        if (tupleArity !== undefined) {
             // Transpose: per-bar tuples [[o1,c1],[o2,c2],...] → per-element arrays [PAO([o1,o2,...]), PAO([c1,c2,...])]
-            const numElements = result[0].length;
             const transposed = [];
-            for (let e = 0; e < numElements; e++) {
+            for (let e = 0; e < tupleArity; e++) {
                 const columnValues = result.map(barTuple => barTuple[e]);
-                const type = columnValues.length > 0 ? detectArrayType(columnValues[0]) : PineArrayType.float;
+                const type = columnValues.length > 0
+                    ? detectArrayType(columnValues[0])
+                    : (expressionTypes[e] ?? PineArrayType.any);
                 transposed.push(new PineArrayObject(columnValues, type, context));
             }
             return [transposed]; // 2D for tuple destructuring
         } else {
             // Scalar: single array of values wrapped in PineArrayObject
-            const type = result.length > 0 ? detectArrayType(result[0]) : PineArrayType.float;
+            const type = result.length > 0
+                ? detectArrayType(result[0])
+                : (expressionTypes[0] ?? PineArrayType.any);
             return new PineArrayObject(result, type, context);
         }
     };

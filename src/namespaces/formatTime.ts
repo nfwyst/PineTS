@@ -166,6 +166,12 @@ const lastStandardOffsets = new Map<string, number>();
 // Java keeps the pre-2024b definitions of these zones: a fixed standard offset with US federal daylight
 // time only (1918-1919 and the 1942-1945 war time) before the zones follow America/* from 1967.
 const LEGACY_US_ZONES: Record<string, number> = { EST5EDT: -5, CST6CDT: -6, MST7MDT: -7, PST8PDT: -8 };
+const LEGACY_US_INTL_IDS: Record<string, string> = {
+    EST5EDT: 'America/New_York',
+    CST6CDT: 'America/Chicago',
+    MST7MDT: 'America/Denver',
+    PST8PDT: 'America/Los_Angeles',
+};
 const LEGACY_US_END = Date.UTC(1967, 0, 1);
 // prettier-ignore
 const FEDERAL_DAYLIGHT = [[1918, 3, 31, 1918, 10, 27], [1919, 3, 30, 1919, 10, 26], [1942, 2, 9, 1945, 9, 30]];
@@ -204,8 +210,9 @@ function regionOffsetMs(id: string, t: number): number {
     const at = Math.max(t, UTC_1900);
     let f = offsetFormatters.get(id);
     if (!f) {
+        const intlId = LEGACY_US_INTL_IDS[id] ?? id;
         // prettier-ignore
-        f = new Intl.DateTimeFormat('en-US', { timeZone: id, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+        f = new Intl.DateTimeFormat('en-US', { timeZone: intlId, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
         offsetFormatters.set(id, f);
     }
     const p: Record<string, number> = {};
@@ -255,7 +262,7 @@ export function estimateDaylight(id: string, t: number): boolean {
     if (t < UTC_1900) return false;
     let f = nameFormatters.get(id);
     if (!f) {
-        f = new Intl.DateTimeFormat('en-US', { timeZone: id, timeZoneName: 'long' });
+        f = new Intl.DateTimeFormat('en-US', { timeZone: LEGACY_US_INTL_IDS[id] ?? id, timeZoneName: 'long' });
         nameFormatters.set(id, f);
     }
     const name = f.formatToParts(t).find((p) => p.type === 'timeZoneName')?.value ?? '';

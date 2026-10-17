@@ -12,15 +12,15 @@ import { PineTS } from '../../../src/PineTS.class';
  * TradingView ground truth (probed 2026-06-19, BTCUSDC 1W, `var float x = na`):
  *   na(x==x)=na(x!=x)=na(x==5)=na(x<1)=na(x>1)=na(x<=1)=na(x>=1) = true
  *   (x==x)?1:0 = 0   (branch unaffected)
- *   1.0+5e-10 == 1.0 -> false   (TV tolerance ~1e-10, tighter than PineTS's old 1e-9)
+ *   1.0+5e-10 == 1.0 -> false   (rounding to nine fractional digits crosses the boundary)
  *   1.0+5e-11 == 1.0 -> true
- *   1.0+5e-11 >  1.0 -> false   (relational applies the same ~1e-10 tolerance)
+ *   1.0+5e-11 >  1.0 -> false   (relational operators use the same rounding)
  *
  * These run through the full Pine-source transpiler path (so the `==`/`!=`/
  * relational operator rewrites are exercised). Booleans are encoded as
  * `cond ? 1 : 0` so plot values are unambiguous numbers.
  *
- * Run: npx vitest run tests/namespaces/math/na-comparison.test.ts
+ * Run: bunx --bun vitest run tests/namespaces/math/na-comparison.test.ts
  */
 
 function makeBars(n: number) {
@@ -105,19 +105,19 @@ describe('na propagation — relational < <= > >= (must pass after fix)', () => 
     });
 });
 
-describe('epsilon tolerance tightened to 1e-10 (must pass after fix)', () => {
-    it('== uses ~1e-10 tolerance (5e-10 differs, 5e-11 equal)', async () => {
+describe('nine-fractional-digit comparison rounding', () => {
+    it('rounds equality operands before comparing them', async () => {
         const ctx = await runPine(`
             //@version=6
             indicator("t")
             plot((1.0 + 5e-10 == 1.0) ? 1 : 0, "outside")
             plot((1.0 + 5e-11 == 1.0) ? 1 : 0, "inside")
         `);
-        expect(val(ctx, 'outside')).toBe(0); // 5e-10 > 1e-10 -> not equal (TV)
-        expect(val(ctx, 'inside')).toBe(1);  // 5e-11 < 1e-10 -> equal (TV)
+        expect(val(ctx, 'outside')).toBe(0);
+        expect(val(ctx, 'inside')).toBe(1);
     });
 
-    it('relational applies the same ~1e-10 tolerance', async () => {
+    it('rounds relational operands with the same rule', async () => {
         const ctx = await runPine(`
             //@version=6
             indicator("t")
@@ -125,9 +125,9 @@ describe('epsilon tolerance tightened to 1e-10 (must pass after fix)', () => {
             plot((1.0 <= 1.0 + 5e-11) ? 1 : 0, "le_within")
             plot((1.0 + 5e-10 > 1.0) ? 1 : 0, "gt_outside")
         `);
-        expect(val(ctx, 'gt_within')).toBe(0);  // within tol -> not greater
-        expect(val(ctx, 'le_within')).toBe(1);  // within tol -> <= true
-        expect(val(ctx, 'gt_outside')).toBe(1); // outside tol -> greater
+        expect(val(ctx, 'gt_within')).toBe(0);
+        expect(val(ctx, 'le_within')).toBe(1);
+        expect(val(ctx, 'gt_outside')).toBe(1);
     });
 });
 

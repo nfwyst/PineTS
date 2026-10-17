@@ -31,20 +31,30 @@
  * (`Core.ts` `AlertHelper`, `Plots.ts` `PlotHelper`/`HlineHelper`/
  * `FillHelper`, and the drawing helpers all conform.)
  */
-export function silentInSecondary(
-    _target: any,
-    _propertyKey: string,
-    descriptor: PropertyDescriptor,
-): PropertyDescriptor {
-    const original = descriptor.value;
-    if (typeof original !== 'function') return descriptor;
+// Supports BOTH decorator semantics so PineTS source can be imported from any
+// Bun/TS project regardless of its tsconfig:
+//   - legacy experimentalDecorators (PineTS own tsconfig):
+//       (target, propertyKey, descriptor) => descriptor
+//   - TC39 stage-3/standard decorators (Bun default when the importing
+//     project has no experimentalDecorators config in scope):
+//       (value, context) where context.kind === 'method'
+export function silentInSecondary(target: any, propertyKey: any, descriptor?: any): any {
+    const wrap = (original: (...args: any[]) => any) =>
+        function (this: any, ...args: any[]) {
+            if (this && this.context && this.context.isSecondaryContext) {
+                return null;
+            }
+            return original.apply(this, args);
+        };
 
-    descriptor.value = function (...args: any[]) {
-        if (this && this.context && this.context.isSecondaryContext) {
-            return null;
-        }
-        return original.apply(this, args);
-    };
+    // TC39 standard method decorator: silentInSecondary(value, {kind:'method'})
+    if (typeof target === 'function' && propertyKey && typeof propertyKey === 'object' && propertyKey.kind === 'method') {
+        return wrap(target);
+    }
 
-    return descriptor;
+    // Legacy experimental decorator: (target, key, descriptor)
+    const d = descriptor as PropertyDescriptor | undefined;
+    if (!d || typeof d.value !== 'function') return d;
+    d.value = wrap(d.value);
+    return d;
 }

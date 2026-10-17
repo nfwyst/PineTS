@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrayPrecision, getKlines, runNSFunctionWithArgs } from '../../utils';
+import { arrayPrecision, getKlines, normalizePlotString, runNSFunctionWithArgs } from '../../utils';
 
 import { Context, PineTS, Provider } from 'index';
 
@@ -19,11 +19,11 @@ describe('Technical Analysis - Statistical Functions', () => {
         const part = result.values.reverse().slice(0, 10);
         const expected = [98599.02, 98599.02, 98599.02, 98599.02, 98599.02, 98599.02, 98599.02, 98599.02, 98599.02, 98599.02];
         console.log(' HIGHEST ', part);
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('LOWEST - Lowest Value', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', 'D', null, new Date('2025-09-29').getTime(), new Date('2025-11-20').getTime());
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'D', null, new Date('2025-09-29').getTime(), new Date('2025-11-20').getTime());
 
         const sourceCode = (context: Context) => {
             const { low, open } = context.data;
@@ -81,7 +81,7 @@ describe('Technical Analysis - Statistical Functions', () => {
 [2025-11-19T00:00:00.000-00:00]: 88530.87 | Low=88530.87 | Open=92935.93
 [2025-11-20T00:00:00.000-00:00]: 86000 | Low=86000 | Open=91489.59`;
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('MEDIAN - Median Value', async () => {
@@ -90,7 +90,7 @@ describe('Technical Analysis - Statistical Functions', () => {
         const part = result.values.reverse().slice(0, 10);
         const expected = [98248.125, 98248.125, 98248.125, 98223.99, 98216.965, 98200.695, 98177.11, 98144.895, 98079.285, 98025.65];
         console.log(' MEDIAN ', part);
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('STDEV - Standard Deviation (biased)', async () => {
@@ -102,7 +102,7 @@ describe('Technical Analysis - Statistical Functions', () => {
             252.6669577634, 257.961053433,
         ];
         console.log(' STDEV (biased) ', part);
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('STDEV - Standard Deviation (unbiased)', async () => {
@@ -114,7 +114,7 @@ describe('Technical Analysis - Statistical Functions', () => {
             262.2048936989, 267.6988364153,
         ];
         console.log(' STDEV (unbiased) ', part);
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('HIGHESTBARS - Bars Since Highest', async () => {
@@ -170,7 +170,7 @@ describe('Technical Analysis - Statistical Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('MODE - Mode Value', async () => {
@@ -226,7 +226,7 @@ describe('Technical Analysis - Statistical Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('LOWESTBARS - Bars Since Lowest', async () => {
@@ -282,7 +282,7 @@ describe('Technical Analysis - Statistical Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('PERCENTRANK - Percentile Rank', async () => {
@@ -338,7 +338,7 @@ describe('Technical Analysis - Statistical Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('percentile_linear_interpolation - Percentile (Linear)', async () => {
@@ -394,7 +394,7 @@ describe('Technical Analysis - Statistical Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('percentile_nearest_rank - Percentile (Nearest Rank)', async () => {
@@ -450,7 +450,7 @@ describe('Technical Analysis - Statistical Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('correlation - Correlation Coefficient', async () => {
@@ -506,6 +506,6 @@ describe('Technical Analysis - Statistical Functions', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });

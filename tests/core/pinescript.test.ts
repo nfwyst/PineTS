@@ -1,12 +1,44 @@
-import { describe, expect, it } from 'vitest';
-import { getKlines, runNSFunctionWithArgs } from '../utils';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { getKlines, normalizeNumericGraph, runNSFunctionWithArgs } from '../utils';
 import { Context, PineTS } from 'index';
 import { transpile } from 'transpiler';
-import { Provider } from '@pinets/marketData/Provider.class';
+import { Provider as RuntimeProvider } from '@pinets/marketData/Provider.class';
 import fs from 'fs';
 import { deepEqual } from '../compatibility/lib/serializer';
+import baseline from './data/pinescript-baseline.json';
+
+const offlineFetchGuard = vi.fn((): never => {
+    throw new Error('Network access is forbidden in tests/core/pinescript.test.ts');
+});
+
+const fixtureBinanceProvider = {
+    configure: () => undefined,
+    getMarketData: async (tickerId: string, timeframe: string) => {
+        if (tickerId === baseline.btcUsdt4h.provenance.symbol && timeframe === '4H') {
+            return baseline.btcUsdt4h.klines.map((kline) => ({ ...kline }));
+        }
+        if (tickerId === baseline.btcUsdc1w.provenance.symbol && timeframe === 'W') {
+            return baseline.btcUsdc1w.klines.map((kline) => ({ ...kline }));
+        }
+        throw new Error(`Missing offline PineScript baseline fixture for ${tickerId} ${timeframe}`);
+    },
+    getSymbolInfo: (tickerId: string) => RuntimeProvider.Mock.getSymbolInfo(tickerId),
+};
+
+const Provider = { ...RuntimeProvider, Binance: fixtureBinanceProvider };
+
+beforeAll(() => vi.stubGlobal('fetch', offlineFetchGuard));
+afterEach(() => {
+    expect(offlineFetchGuard).not.toHaveBeenCalled();
+    offlineFetchGuard.mockClear();
+});
+afterAll(() => vi.unstubAllGlobals());
 
 describe('PineScript Language', () => {
+    it('offline fixture guard', () => {
+        expect(offlineFetchGuard).not.toHaveBeenCalled();
+    });
+
     it('History', async () => {
         //const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '4H', 5000, new Date('Aug 17 2017').getTime(), new Date('Nov 25 2025').getTime());
         const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '4H', 20, new Date('Sep 20 2025').getTime(), new Date('Nov 25 2025').getTime());
@@ -36,7 +68,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
     it('Compound Assignment', async () => {
         //const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '4H', 5000, new Date('Aug 17 2017').getTime(), new Date('Nov 25 2025').getTime());
@@ -74,7 +106,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 1: Variable Declarations and Types
@@ -112,11 +144,11 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('tuples', async () => {
-        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, new Date('2024-01-01').getTime(), new Date('2025-11-10').getTime());
+        const pineTS = new PineTS(RuntimeProvider.Mock, 'BTCUSDC', 'W', null, new Date('2024-01-01').getTime(), new Date('2025-11-10').getTime());
 
         const { result, plots } = await pineTS.run(async (context) => {
             const { close, open } = context.data;
@@ -226,7 +258,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Variable Initialization with Default Values', async () => {
@@ -280,7 +312,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Variable Reassignment', async () => {
@@ -319,7 +351,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 2: Variable Scoping
@@ -355,7 +387,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Block Scope Isolation', async () => {
@@ -392,7 +424,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Variable Shadowing', async () => {
@@ -426,7 +458,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Function Parameter Scope', async () => {
@@ -461,7 +493,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Nested Scope Variable Access', async () => {
@@ -495,7 +527,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 3: History Access and Series Behavior
@@ -531,7 +563,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('History Access with Variable Index', async () => {
@@ -564,7 +596,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('History Access with Nested Index', async () => {
@@ -598,7 +630,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('History Access Edge Cases', async () => {
@@ -636,7 +668,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Series Initialization on First Bar', async () => {
@@ -667,7 +699,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 4: Operators - Arithmetic
@@ -803,7 +835,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Logical Operators', async () => {
@@ -878,7 +910,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 5: Operators - Advanced
@@ -909,7 +941,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Unary Operators', async () => {
@@ -990,7 +1022,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Operator Precedence', async () => {
@@ -1023,7 +1055,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('NaN Comparisons', async () => {
@@ -1058,7 +1090,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Short-Circuit Evaluation', async () => {
@@ -1112,7 +1144,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 6: Control Flow - Conditionals
@@ -1143,7 +1175,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('If-Else Statement', async () => {
@@ -1175,7 +1207,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('If-Else If-Else Chain', async () => {
@@ -1211,7 +1243,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Nested If Statements', async () => {
@@ -1247,7 +1279,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Ternary Operator as Expression', async () => {
@@ -1277,7 +1309,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 7: Control Flow - Switch
@@ -1317,7 +1349,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 8: Loops - For Loops
@@ -1348,7 +1380,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('For Loop with Series Range', async () => {
@@ -1382,7 +1414,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('For Loop Variable Scope', async () => {
@@ -1413,7 +1445,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('For Loop History Access', async () => {
@@ -1447,7 +1479,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Nested For Loops', async () => {
@@ -1479,7 +1511,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 9: Loops - While and Control
@@ -1512,7 +1544,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Break Statement', async () => {
@@ -1545,7 +1577,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Continue Statement', async () => {
@@ -1578,7 +1610,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 10: Functions
@@ -1610,7 +1642,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Function Call with Literal Arguments', async () => {
@@ -1641,7 +1673,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Function Call with Series Arguments', async () => {
@@ -1675,7 +1707,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Function Return Values', async () => {
@@ -1716,7 +1748,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Function Parameter History Access', async () => {
@@ -1752,7 +1784,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it.skip('Recursive Functions', async () => {
@@ -1816,7 +1848,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Default Parameter Values', async () => {
@@ -1850,7 +1882,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Multiple Return Statements', async () => {
@@ -1887,7 +1919,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 11: Arrays and Destructuring
@@ -1952,7 +1984,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Array Assignment', async () => {
@@ -1984,7 +2016,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Array Destructuring', async () => {
@@ -2017,7 +2049,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it.skip('Array History Access', async () => {
@@ -2074,7 +2106,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('NaN and na Handling', async () => {
@@ -2112,7 +2144,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Null and Undefined Handling', async () => {
@@ -2144,7 +2176,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Boolean Conversion', async () => {
@@ -2201,7 +2233,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('String Operations', async () => {
@@ -2275,7 +2307,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 13: Expression Evaluation
@@ -2338,7 +2370,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Parentheses Precedence', async () => {
@@ -2368,7 +2400,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Conditional Assignment Patterns', async () => {
@@ -2401,7 +2433,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     // Category 14: Edge Cases and Special Behaviors
@@ -2436,7 +2468,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Variable Used Before Initialization', async () => {
@@ -2521,7 +2553,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Series Length Consistency', async () => {
@@ -2558,7 +2590,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('First Bar Special Handling', async () => {
@@ -2592,7 +2624,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Bar-by-Bar Execution', async () => {
@@ -2624,7 +2656,7 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 
     it('Operator Precedence Complex', async () => {
@@ -2664,6 +2696,6 @@ describe('PineScript Language', () => {
         };
 
         expect(deepEqual(context.result, expected)).toBe(true);
-        expect(context.result).toEqual(expected);
+        expect(normalizeNumericGraph(context.result)).toEqual(normalizeNumericGraph(expected));
     });
 });

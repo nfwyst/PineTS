@@ -90,6 +90,29 @@ plot(close)
             expect(meta.map((m) => m.type)).toEqual(['int', 'float', 'string', 'bool']);
         });
 
+        it.each([
+            { operator: '==', expected: 1 },
+            { operator: '!=', expected: 2 },
+            { operator: '<', expected: 2 },
+            { operator: '<=', expected: 1 },
+            { operator: '>', expected: 2 },
+            { operator: '>=', expected: 1 },
+        ])('folds float $operator comparisons with Pine precision in input defaults', async ({ operator, expected }) => {
+            // Given
+            const code = `//@version=6
+indicator("Const comparison input")
+value = input.int(1 ${operator} 1.0000000004 ? 1 : 2, "Value")
+plot(value, "value")`;
+            const indicator = new Indicator(code);
+
+            // When
+            const context = await new PineTS(makeData(1)).run(indicator);
+
+            // Then
+            expect(indicator.getInputsMeta()[0]?.defval).toBe(expected);
+            expect(context.plots.value.data.at(-1)?.value).toBe(expected);
+        });
+
         it('returns an empty array for JS-function source', () => {
             const ind = new Indicator(($: any) => { return $.data.close[0]; });
             expect(ind.getInputsMeta()).toEqual([]);

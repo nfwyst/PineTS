@@ -27,7 +27,7 @@
  * Mock data window: D and W — see `tests/compatibility/_data`. We use
  * D chart with W HTF so both timeframes resolve to local data files.
  *
- * Run via `npm test -- --run tests/namespaces/request-htf-pre-phase4`.
+ * Run via `bun run test --run tests/namespaces/request-htf-pre-phase4`.
  */
 
 import { describe, it, expect } from 'vitest';

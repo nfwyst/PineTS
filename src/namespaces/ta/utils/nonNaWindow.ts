@@ -4,6 +4,12 @@ export const isNa = (v: any): boolean => v === null || v === undefined || (typeo
 
 type Entry = { v: number; n: number };
 
+function compensatedAdd(sum: number, correction: number, value: number): [number, number] {
+    const adjusted = value - correction;
+    const next = sum + adjusted;
+    return [next, (next - sum) - adjusted];
+}
+
 /**
  * The last `length` non-na values of a source, newest first, and their sum: the window TradingView's
  * `ta.sma`, `ta.variance`, `ta.stdev`, `ta.median`, `ta.vwma` and `ta.correlation` use. An na value is
@@ -27,8 +33,8 @@ export function nonNaWindow(
     if (!state) {
         state = context.taState[key] = {
             lastIdx: -1,
-            prev: { entries: [] as Entry[], sum: 0, calls: 0, callIdx: -1, exhausted: false, length: NaN },
-            current: { entries: [] as Entry[], sum: 0, calls: 0, callIdx: -1, exhausted: false, length: NaN },
+            prev: { entries: [] as Entry[], sum: 0, correction: 0, calls: 0, callIdx: -1, exhausted: false, length: NaN },
+            current: { entries: [] as Entry[], sum: 0, correction: 0, calls: 0, callIdx: -1, exhausted: false, length: NaN },
         };
     }
     if (context.idx > state.lastIdx) {
@@ -40,14 +46,15 @@ export function nonNaWindow(
     const calls = prev.calls + 1;
     const entries: Entry[] = [...prev.entries];
     let sum = prev.sum;
+    let correction = prev.correction;
     let exhausted = prev.exhausted && prev.callIdx === context.idx - 1 && prev.length === length;
 
     const value = valueAt(0);
     if (!isNa(value)) {
         entries.unshift({ v: value, n: calls });
-        sum += value;
+        [sum, correction] = compensatedAdd(sum, correction, value);
     }
-    while (entries.length > length) sum -= entries.pop()!.v;
+    while (entries.length > length) [sum, correction] = compensatedAdd(sum, correction, -entries.pop()!.v);
 
     let rebuilt = prev.length !== length;
     if (entries.length < length && !exhausted && (calls >= length || context.idx >= length - 1)) {
@@ -59,8 +66,12 @@ export function nonNaWindow(
         exhausted = entries.length < length;
         rebuilt = true;
     }
-    if (rebuilt) sum = entries.reduce((s, e) => s + e.v, 0);
+    if (rebuilt) {
+        sum = 0;
+        correction = 0;
+        for (const entry of entries) [sum, correction] = compensatedAdd(sum, correction, entry.v);
+    }
 
-    state.current = { entries, sum, calls, callIdx: context.idx, exhausted, length };
+    state.current = { entries, sum, correction, calls, callIdx: context.idx, exhausted, length };
     return entries.length < length ? undefined : { values: entries.map((e) => e.v), sum };
 }

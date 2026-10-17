@@ -8,10 +8,12 @@ parent: API Coverage
 
 ### Chart Properties
 
-| Function         | Status | Description      |
-| ---------------- | ------ | ---------------- |
-| `chart.bg_color` | ✅     | Background color |
-| `chart.fg_color` | ✅     | Foreground color |
+| Function         | Status | Description                                                                  |
+| ---------------- | ------ | ---------------------------------------------------------------------------- |
+| `chart.bg_color` | ✅     | Per-instance host background; defaults to `#1e293b`                           |
+| `chart.fg_color` | ✅     | Per-instance host foreground; defaults to `#d1d4dc`                           |
+
+Hosts configure these values with the `PineTS` constructor's `options.chartTheme` object. Themes are validated and isolated per `PineTS` instance.
 
 ### Chart Type Detection
 

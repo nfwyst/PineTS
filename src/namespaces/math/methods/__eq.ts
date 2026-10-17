@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { Series } from '../../../Series';
+import { roundForComparison } from '../comparison';
 
 export function __eq(context: any) {
     return (a: any, b: any) => {
@@ -13,8 +14,7 @@ export function __eq(context: any) {
             // na propagates — use `na(x == y)` to test for it.
             if (isNaN(valA) || isNaN(valB)) return NaN;
 
-            // TradingView treats values equal within an absolute 1e-10 tolerance.
-            return Math.abs(valA - valB) < 1e-10;
+            return roundForComparison(valA) === roundForComparison(valB);
         }
 
         return valA === valB;

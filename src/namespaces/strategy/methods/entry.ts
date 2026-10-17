@@ -14,9 +14,9 @@ import { parseArgsForPineParams } from '../../utils';
  * Differences vs strategy.order:
  *   - Respects the strategy() declaration's `pyramiding` cap (no-op when
  *     the direction's open-trade count already equals the cap).
- *   - Auto-reverses the current position when direction is opposite:
- *     the resulting market order's qty is sized to close the existing
- *     position AND open a new one of the requested qty in the new direction.
+ *   - Auto-reverses the current position when direction is opposite. The
+ *     queue stores the requested base quantity; the fill path adds the
+ *     opposite position that still exists when the order actually executes.
  */
 const ENTRY_SIGNATURES = [
     ['id', 'direction', 'qty', 'limit', 'stop', 'oca_name', 'oca_type', 'comment', 'alert_message', 'disable_alert'],
@@ -91,10 +91,8 @@ export function entry(context: any) {
             return; // no-op
         }
 
-        // Determine the order qty. For a reversal (direction differs from
-        // current position), Pine ADDS the absolute current position to the
-        // requested qty so that one market order both flattens the prior
-        // position AND opens the new direction with the requested size.
+        // Determine the provisional queue-time qty. The fill path recomputes
+        // the reversal add-on from the position that still exists at execution.
         const currentPrice = Series.from(context.data.close).get(0);
 
         // Determine order type from limit/stop presence
@@ -138,12 +136,9 @@ export function entry(context: any) {
             oca_type: ocaType as 'cancel' | 'reduce' | 'none' | undefined,
             comment: commentValue,
             _isReversalEntry: isReversal,
-            // Ordered base size (before the reversal close-qty addition).
-            // executeOrder uses it to split a reversal OVERSHOOT into its
-            // own lot when a deferred close-margin-call shrank the
-            // position between queue and fill — TV books the base and the
-            // overshoot as two separate lots (xlsx 2021-10-02: 5 +
-            // 0.263108 longs at the same fill).
+            // Requested base size before any reversal close-qty addition.
+            // fillEntryOrder uses it to recompute the reversal add-on
+            // against the position that exists at the actual fill.
             _base_qty: baseQty,
         } as any;
 

@@ -9,6 +9,7 @@ import {
     NAMESPACES_LIKE,
     ASYNC_METHODS,
     CALLSITE_ID_NAMESPACES,
+    CALLSITE_ID_FUNCTIONS,
     BUILTIN_METHOD_NAMES,
     ORDERFLOW_METHODS,
     FOOTPRINT_ROW_METHODS,
@@ -198,6 +199,58 @@ export function transformArrayIndex(node: any, scopeManager: ScopeManager): void
             node.property = transformOperand(node.property, scopeManager);
         }
     }
+}
+
+function transformIndexExpression(property: any, scopeManager: ScopeManager, namespace?: string): any {
+    if (property.type === 'Identifier' && !scopeManager.isContextBound(property.name) && !scopeManager.isLoopVariable(property.name)) {
+        return ASTFactory.createGetCall(transformIdentifierForParam(property, scopeManager), 0);
+    }
+    if (
+        property.type === 'BinaryExpression' ||
+        property.type === 'UnaryExpression' ||
+        property.type === 'LogicalExpression' ||
+        property.type === 'ConditionalExpression'
+    ) {
+        return transformOperand(property, scopeManager, namespace);
+    }
+    return property;
+}
+
+function needsUdtFieldValueHistory(name: string, scopeManager: ScopeManager): boolean {
+    // A typed UDF parameter may receive a persistent `var` UDT, but the
+    // parameter itself no longer carries that declaration kind. Its Series
+    // entries can therefore alias one mutable object across every bar. Store
+    // the scalar field timeline for all UDT parameters, just as for a directly
+    // referenced `var` instance.
+    const kind = scopeManager.getVariable(name)[1];
+    return scopeManager.isLocalSeriesVar(name) || kind === 'var' || kind === 'varip';
+}
+
+function transformUdtFieldHistory(
+    chain: any,
+    baseRef: any,
+    index: any,
+    isVarInstance: boolean,
+    scopeManager: ScopeManager,
+): any {
+    let cursor: any = chain;
+    while (cursor.object && cursor.object.type === 'MemberExpression') {
+        cursor = cursor.object;
+    }
+    cursor.object = ASTFactory.createGetCall(baseRef, isVarInstance ? 0 : index);
+    if (!isVarInstance) {
+        return chain;
+    }
+
+    const paramId = scopeManager.generateParamId();
+    const paramCall = {
+        type: 'CallExpression',
+        callee: ASTFactory.createMemberExpression(ASTFactory.createContextIdentifier(), ASTFactory.createIdentifier('param')),
+        arguments: [chain, UNDEFINED_ARG, makeParamNameArg(scopeManager, paramId)],
+        _transformed: true,
+        _isParamCall: true,
+    };
+    return ASTFactory.createGetCall(paramCall, index);
 }
 
 export function addArrayAccess(node: any, scopeManager: ScopeManager): void {
@@ -702,9 +755,9 @@ export function transformMemberExpression(memberNode: any, originalParamName: st
     // Subscript on a UDT-field chain: `bar.low[N]` where `bar` is a user
     // variable known to hold a UDT instance.
     //
-    // Pine semantics: `bar.low[N]` reads bar's `.low` from N bars ago.
-    // Since `bar = BAR.new()` runs every bar, `$.let.glb1_bar` is a Series
-    // of PineTypeObject instances → `$.get(glb1_bar, N).low` is correct.
+    // Pine semantics: `bar.low[N]` reads bar's `.low` from N bars ago. Per-bar
+    // instances keep history on the object series, while a persistent `var`
+    // instance needs history accumulated from the field value itself.
     //
     // The rewrite is gated by `scopeManager.isUdtInstance(leafBaseName)` so it
     // does NOT fire for JS-style array indexing (e.g. `pl.points[0]` where
@@ -732,13 +785,18 @@ export function transformMemberExpression(memberNode: any, originalParamName: st
                       return id;
                   })()
                 : createScopedVariableReference(baseName, scopeManager);
-            // Replace leaf `bar` with `$.get(<base-ref>, lookback)` and drop
-            // the outer `[N]` — the chain (`.low`) now reads from the previous
-            // bar's UDT instance.
-            cursor.object = ASTFactory.createGetCall(baseRef, memberNode.property);
+            const index = memberNode._indexTransformed
+                ? memberNode.property
+                : transformIndexExpression(memberNode.property, scopeManager);
+            const rewritten = transformUdtFieldHistory(
+                memberNode.object,
+                baseRef,
+                index,
+                needsUdtFieldValueHistory(baseName, scopeManager),
+                scopeManager,
+            );
             // Re-anchor memberNode to the (now-rewritten) inner MemberExpression.
-            const inner = memberNode.object;
-            Object.assign(memberNode, inner);
+            Object.assign(memberNode, rewritten);
             delete memberNode.computed;
             return;
         }
@@ -1250,6 +1308,7 @@ export function transformFunctionArgument(arg: any, namespace: string, scopeMana
                 }
                 if (element.type === 'MemberExpression') {
                     transformMemberExpression(element, namespace, scopeManager);
+                    if (element.type === 'CallExpression' && !element._transformed) transformCallExpression(element, scopeManager);
                     // e.g. enum fields in `input.enum(…, options = [E.a, E.b])`
                     if (!element.computed) scopeMemberChainBase(element, scopeManager);
                     return element;
@@ -1302,13 +1361,19 @@ export function transformFunctionArgument(arg: any, namespace: string, scopeMana
                           return id;
                       })()
                     : createScopedVariableReference(baseName, scopeManager);
-                cursor.object = ASTFactory.createGetCall(baseRef, arg.property);
-                // `arg.object` is now the rewritten `$.get(<base>, N).field…`
-                // chain; it replaces the whole `arg` expression. The outer
-                // `$.param(...)` wrapper that the rest of this branch would
-                // have applied is intentionally skipped — the lookback is
-                // already baked into `$.get(...)`.
-                return arg.object;
+                if (!arg._udtIndexTransformed) {
+                    arg.property = transformIndexExpression(arg.property, scopeManager, namespace);
+                    arg._udtIndexTransformed = true;
+                }
+                // The returned expression already contains its lookback, so the
+                // generic namespace-param wrapper below must not wrap it again.
+                return transformUdtFieldHistory(
+                    arg.object,
+                    baseRef,
+                    arg.property,
+                    needsUdtFieldValueHistory(baseName, scopeManager),
+                    scopeManager,
+                );
             }
         }
 
@@ -1446,9 +1511,8 @@ export function transformFunctionArgument(arg: any, namespace: string, scopeMana
             const variableDecl = ASTFactory.createVariableDeclaration(tempVarName, callExpr);
             scopeManager.addOuterHoistedStatement(variableDecl);
 
-            // Replace the argument with a reference to the hoisted variable
-            Object.assign(arg, ASTFactory.createIdentifier(tempVarName));
-            return arg;
+            // Feed the hoisted result through the same namespace param wrapper as every other argument.
+            return transformFunctionArgument(ASTFactory.createIdentifier(tempVarName), namespace, scopeManager);
         }
 
         // Handle property access like trade.entry
@@ -1488,6 +1552,37 @@ export function transformFunctionArgument(arg: any, namespace: string, scopeMana
         arg.properties = arg.properties.map((prop: any) => {
             // Get the variable name and kind
             if (prop.value.name) {
+                // request.* named arguments (`lookahead = la`,
+                // `calc_bars_count = N`, `expression = x`,
+                // `symbol = sym`, `timeframe = tf`) bind the variable's
+                // CURRENT VALUE, exactly like a literal at the call site. A
+                // plain identifier in the named-arguments bag used to stay
+                // raw (`$.let.<name>`, the Series itself), so the runtime
+                // could neither unwrap the enum/number/string nor attach the
+                // expression param name: `calc_bars_count = N` was silently
+                // dropped, `symbol = sym`/`timeframe = tf` read as objects,
+                // and a named expression alias never resolved. Wrap it
+                // through the namespace param like every other argument; the
+                // param paths below already handle builtins (close, time, …)
+                // and user variables.
+                if (namespace === 'request') {
+                    return {
+                        type: 'Property',
+                        key: {
+                            type: 'Identifier',
+                            name: prop.key.name,
+                        },
+                        value: transformFunctionArgument(
+                            ASTFactory.createIdentifier(prop.value.name),
+                            namespace,
+                            scopeManager,
+                        ),
+                        kind: 'init',
+                        method: false,
+                        shorthand: false,
+                        computed: false,
+                    };
+                }
                 // `x2 = time`: a dual-use built-in (time, hour, …) is the namespace function,
                 // its series lives in `.__value`. `na` stays the helper the callees recognize.
                 if (NAMESPACES_LIKE.includes(prop.value.name) && prop.value.name !== 'na' && scopeManager.isContextBound(prop.value.name)) {
@@ -1924,10 +2019,34 @@ function transformCallExpressionInner(node: any, scopeManager: ScopeManager, nam
             return transformFunctionArgument(arg, CONTEXT_NAME, scopeManager);
         });
 
+        // Bare plot-like functions need static AST callsite identity just like
+        // plot.* calls; runtime execution order is not stable across branches.
+        if (CALLSITE_ID_FUNCTIONS.includes(node.callee.name) && scopeManager.isContextBound(node.callee.name)) {
+            node.arguments.push({
+                type: 'ObjectExpression',
+                properties: [{
+                    type: 'Property',
+                    key: { type: 'Identifier', name: '__callsiteId' },
+                    value: scopeManager.getNextPlotCallId(),
+                    kind: 'init',
+                    computed: false,
+                    shorthand: false,
+                }],
+            });
+        }
+
         // `type Vis` with a user method declared on it: name the factory so a receiver can be
         // recognised as a `Vis` at runtime (`Context.callMethod`).
-        if (node.callee.name === 'Type' && node._udtName && scopeManager.isMethodReceiverTypeName(node._udtName)) {
-            node.arguments.push({ type: 'Literal', value: node._udtName, raw: JSON.stringify(node._udtName) });
+        if (node.callee.name === 'Type') {
+            const typeName = node._udtName && scopeManager.isMethodReceiverTypeName(node._udtName)
+                ? { type: 'Literal', value: node._udtName, raw: JSON.stringify(node._udtName) }
+                : undefined;
+            if (typeof node._pineVersionOverride === 'number') {
+                node.arguments.push(typeName ?? UNDEFINED_ARG);
+                node.arguments.push({ type: 'Literal', value: node._pineVersionOverride });
+            } else if (typeName !== undefined) {
+                node.arguments.push(typeName);
+            }
         }
 
         // Inject unique call ID for the function call only if it is a user-defined function
@@ -2292,10 +2411,8 @@ function transformCallExpressionInner(node: any, scopeManager: ScopeManager, nam
         // Case 2 — Chained: $.get(X, N).field.method()
         //   callee.object is a MemberExpression (the .field access), with $.get() deeper
         const isChained = calleeObj?.type === 'MemberExpression' && hasGetCallInChain(calleeObj);
-        // Case 3 — `.delete()` on a field of a plain variable (`for e in arr` → `e.line.delete()`):
-        //   no `$.get()` in the chain, but the field can still be an un-assigned (na) drawing,
-        //   and TradingView treats `delete` on na as a no-op. Limited to `delete` because other
-        //   calls on na are runtime errors there.
+        // Case 3 — a field or loop iterator can still be an na drawing without a `$.get()`
+        // in its receiver chain. Keep this limited to drawing accessor names and `delete`.
         //   The same goes for the result of a user function or method (`arr.addLabel(l).delete()`):
         //   one that falls off its end without a value returns `na`.
         const isUserCallResult =
@@ -2303,16 +2420,19 @@ function transformCallExpressionInner(node: any, scopeManager: ScopeManager, nam
             calleeObj.callee?.type === 'MemberExpression' &&
             calleeObj.callee.object?.name === CONTEXT_NAME &&
             ['call', 'callMethod'].includes(calleeObj.callee.property?.name);
-        const isFieldReceiver =
-            (calleeObj?.type === 'MemberExpression' && !calleeObj.computed && calleeObj.property?.type === 'Identifier') || isUserCallResult;
-        const isFieldDelete = !node.callee.computed && node.callee.property?.name === 'delete' && isFieldReceiver;
+        const isIteratorReceiver = calleeObj?.type === 'Identifier' && scopeManager.isLoopVariable(calleeObj.name);
+        const isNullableDrawingReceiver =
+            (calleeObj?.type === 'MemberExpression' && !calleeObj.computed && calleeObj.property?.type === 'Identifier') ||
+            isUserCallResult ||
+            isIteratorReceiver;
+        const isDrawingDelete = !node.callee.computed && node.callee.property?.name === 'delete' && isNullableDrawingReceiver;
         // Getters and setters of a drawing that is na (an unset UDT field, `box b = na`) return na
         // ("" for get_text) and do nothing on TradingView: the receiver goes through
         // `$.drawingOrNa`, which stands in for an na drawing.
         const isDrawingAccessor =
             !node.callee.computed &&
             /^(get|set)_\w+$/.test(node.callee.property?.name ?? '') &&
-            (isDirect || isChained || isFieldReceiver);
+            (isDirect || isChained || isNullableDrawingReceiver);
         if (isDrawingAccessor) {
             node.callee.object = {
                 type: 'CallExpression',
@@ -2322,7 +2442,7 @@ function transformCallExpressionInner(node: any, scopeManager: ScopeManager, nam
             };
         }
 
-        if (isDirect || isChained || isFieldDelete) {
+        if (isDirect || isChained || isDrawingDelete) {
             // Double optional chaining: obj?.method?.()
             // The node stays as a CallExpression (safe for AST walkers) but gets:
             //   1. optional: true on the CallExpression  → produces ?.()

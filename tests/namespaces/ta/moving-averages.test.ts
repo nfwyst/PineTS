@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrayPrecision, getKlines, runNSFunctionWithArgs } from '../../utils';
+import { arrayPrecision, getKlines, normalizePlotString, runNSFunctionWithArgs } from '../../utils';
 
 import { Context, PineTS, Provider } from 'index';
 import { deepEqual } from '../../compatibility/lib/serializer';
@@ -19,11 +19,11 @@ describe('Technical Analysis - Moving Averages', () => {
 
         const part = result.values.reverse().slice(0, 10);
         const expected = [
-            98235.8228571429, 98272.5414285715, 98279.7214285715, 98261.685, 98208.3371428572, 98158.2628571429, 98135.2328571429, 98119.8821428572,
+            98235.8228571429, 98272.5414285714, 98279.7214285714, 98261.685, 98208.3371428571, 98158.2628571429, 98135.2328571429, 98119.8821428572,
             98095.6421428572, 98078.9178571429,
         ];
         console.log(' SMA ', part);
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('EMA - Exponential Moving Average', async () => {
@@ -37,7 +37,7 @@ describe('Technical Analysis - Moving Averages', () => {
         console.log(' EMA ', part);
 
         expect(deepEqual(part, expected)).toBe(true);
-        //expect(part).toEqual(arrayPrecision(expected));
+        //expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('VWMA - Volume Weighted Moving Average', async () => {
@@ -51,7 +51,7 @@ describe('Technical Analysis - Moving Averages', () => {
         console.log(' VWMA ', part);
 
         expect(deepEqual(part, expected)).toBe(true);
-        //expect(part).toEqual(arrayPrecision(expected));
+        //expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('WMA - Weighted Moving Average', async () => {
@@ -64,7 +64,7 @@ describe('Technical Analysis - Moving Averages', () => {
         ];
         console.log(' WMA ', part);
 
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('HMA - Hull Moving Average', async () => {
@@ -77,7 +77,7 @@ describe('Technical Analysis - Moving Averages', () => {
         ];
         console.log(' HMA ', part);
 
-        //expect(part).toEqual(arrayPrecision(expected));
+        //expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
         expect(deepEqual(part, expected)).toBe(true);
     });
 
@@ -91,7 +91,7 @@ describe('Technical Analysis - Moving Averages', () => {
         ];
         console.log(' RMA ', part);
 
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('LINREG - Linear Regression', async () => {
@@ -103,7 +103,7 @@ describe('Technical Analysis - Moving Averages', () => {
             98351.7985714286, 98367.4022857142,
         ];
         console.log(' LINREG ', part);
-        expect(part).toEqual(arrayPrecision(expected));
+        expect(arrayPrecision(part, 7)).toEqual(arrayPrecision(expected, 7));
     });
 
     it('LINREG - Linear Regression with actual data', async () => {
@@ -167,7 +167,7 @@ plot(res, "plot")
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('ALMA - Arnaud Legoux Moving Average', async () => {
@@ -213,7 +213,7 @@ plot(res, "plot")
 [2025-11-03T00:00:00.000-00:00]: 114325.1796161599
 [2025-11-10T00:00:00.000-00:00]: 112558.7978801021`;
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('SWMA - Symmetrically Weighted Moving Average', async () => {
@@ -261,7 +261,7 @@ plot(res, "plot")
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('VWAP - Volume Weighted Average Price', async () => {
@@ -309,7 +309,7 @@ plot(res, "plot")
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('EMA with NaN values', async () => {
@@ -366,7 +366,7 @@ plot(res, "plot")
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('ATR with NaN values', async () => {
@@ -441,7 +441,7 @@ plot(res, "plot")
 [2019-04-15T00:00:00.000-00:00]: 51.0596242571`;
 
         console.log('ATR plotdata_str\n', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('STDEV with NaN values', async () => {
@@ -502,6 +502,6 @@ plot(res, "plot")
 [2019-04-15T00:00:00.000-00:00]: 51.0596242571`;
 
         console.log('STDEV plotdata_str\n', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });

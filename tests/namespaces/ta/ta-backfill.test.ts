@@ -4,13 +4,13 @@ import { PineTS, Provider } from 'index';
 /**
  * TA Functions — Series Backfill in Conditional and Single-Call Contexts
  *
- * Verifies that all 13 window-based TA functions correctly backfill their
+ * Verifies that window-based TA functions correctly handle their
  * rolling window from the source series when called in contexts where the
  * per-callsite call count is low (conditional blocks, barstate.islast).
  *
- * The context.idx fallback ensures that when the chart has enough historical
- * bars (context.idx >= length-1), the window is filled from the source
- * series regardless of callCount. This enables correct results in:
+ * Most functions backfill when the chart has enough historical bars. Extrema
+ * preserve their conditional call-site history and use partial windows. This
+ * covers:
  *   - Conditional blocks (function called on subset of bars)
  *   - barstate.islast (function called exactly once)
  *
@@ -40,14 +40,12 @@ describe('TA Functions - Series Backfill in Conditional and Single-Call Contexts
     };
 
     // ── PineTS expected: conditional values ────────────────────────────
-    // With context.idx backfill, all functions get their window filled from
-    // the source series on the very first call (context.idx >> length).
-    // Calls 0-3: PineTS backfills → values match TV_TOP (TV itself returns
-    //   NaN for most functions here, but PineTS diverges intentionally to
-    //   support barstate.islast).
-    // Calls 4+: rolling window is naturally full → values match TV exactly.
+    // Most functions backfill from source on the first call. Extrema build a
+    // partial call-site window for calls 0-3; from call 4 onward that window is
+    // naturally full and matches the top-level series.
     const PINETS_COND = {
-        // All period-5 functions: backfill from call 0, values = TV_TOP
+        // Most period-5 functions backfill from call 0, values = TV_TOP.
+        // Extrema use these values only after their call-site window is full.
         sma:  TV_TOP.sma,
         std:  TV_TOP.std,
         var_: TV_TOP.var_,
@@ -195,21 +193,21 @@ plot(_alma_cond, "alma_cond")
         const smaTopVals = extract('sma_top');
         expect(smaTopVals.length, 'should have 10 weekly bars in window').toBe(10);
 
-        // ── Test 1: All functions return values from call 0 (context.idx backfill) ──
-        // With context.idx >= length-1 (chart has enough bars), all functions
-        // backfill their window from the source series on the very first call.
+        // ── Test 1: All functions return values from call 0 ──
+        // Most functions backfill; extrema return their one-value partial window.
         for (const fn of FUNCS) {
             const vals = extract(PLOT_NAMES[fn].cond);
             expect(isNaN(vals[0]), `${fn}_cond[0] should NOT be NaN (backfilled from series)`).toBe(false);
         }
 
-        // ── Test 2: Conditional matches top-level from call 0 ─────
-        // With context.idx backfill, all functions get their window filled
-        // from the source series immediately, so values match top-level.
+        // ── Test 2: Conditional values converge to top-level ─────
+        // Extrema first build their own partial call-site windows; other
+        // functions retain the existing source-backfill behavior.
         for (const fn of FUNCS) {
             const topVals = extract(PLOT_NAMES[fn].top);
             const condVals = extract(PLOT_NAMES[fn].cond);
-            for (let i = 0; i < 10; i++) {
+            const startIdx = fn === 'hi' || fn === 'lo' ? 4 : 0;
+            for (let i = startIdx; i < 10; i++) {
                 approxEqual(condVals[i], topVals[i], `${fn} convergence [${i}]`);
             }
         }
@@ -242,9 +240,8 @@ plot(_alma_cond, "alma_cond")
      * Single-call backfill: TA functions inside barstate.islast
      *
      * When a TA function is called ONLY inside barstate.islast, it is invoked
-     * exactly once (callCount=1). The context.idx fallback ensures the window
-     * is filled from the source series when the chart has enough historical
-     * bars (context.idx >= length-1), so all functions return valid values.
+     * exactly once (callCount=1). Most functions backfill from source; extrema
+     * return the current value from their one-value partial window.
      */
     it('single-call context produces valid values for all TA functions', async () => {
         const pineTS = new PineTS(
@@ -328,6 +325,7 @@ plot(_hi_top, "hi_top")
 plot(_hi_last, "hi_last")
 plot(_lo_top, "lo_top")
 plot(_lo_last, "lo_last")
+plot(close, "close")
 `;
 
         const { plots } = await pineTS.run(code);
@@ -345,9 +343,6 @@ plot(_lo_last, "lo_last")
             { name: 'linreg', top: 'lr_top',  last: 'lr_last' },
             { name: 'roc',  top: 'roc_top',  last: 'roc_last' },
             { name: 'change', top: 'chg_top', last: 'chg_last' },
-            // Already fixed:
-            { name: 'highest', top: 'hi_top', last: 'hi_last' },
-            { name: 'lowest',  top: 'lo_top', last: 'lo_last' },
         ];
 
         const lastIdx = plots['sma_top'].data.length - 1;
@@ -375,5 +370,11 @@ plot(_lo_last, "lo_last")
                 `${fn.name}: last (${lastVal}) should match top (${topVal}), relErr=${relErr}`
             ).toBeLessThan(5e-4);
         }
+
+        // Extrema ignore missing pre-call history, so a one-call local window
+        // contains only the current source value rather than the global window.
+        const closeVal = plots['close'].data[lastIdx].value;
+        expect(plots['hi_last'].data[lastIdx].value).toBe(closeVal);
+        expect(plots['lo_last'].data[lastIdx].value).toBe(closeVal);
     }, 60000);
 });

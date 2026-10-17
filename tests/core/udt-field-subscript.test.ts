@@ -33,6 +33,15 @@ function buildUdtRegistry(jsSource: string): ScopeManager {
     return sm;
 }
 
+type PlotMap = Record<string, { readonly data?: readonly { readonly value: number }[] }>;
+
+function expectHistoryToMatch(plots: PlotMap, actualTitle: string, expectedTitle: string): void {
+    const actual = (plots[actualTitle]?.data ?? []).map((row) => row.value);
+    const expected = (plots[expectedTitle]?.data ?? []).map((row) => row.value).slice(-actual.length);
+    expect(actual.length).toBeGreaterThan(0);
+    expect(actual).toEqual(expected);
+}
+
 // ── 1. UDT registry pre-pass ───────────────────────────────────────────
 
 describe('UDT registry pre-pass (preProcessUdtRegistry)', () => {
@@ -411,14 +420,18 @@ plot(close)
 
     it('rewrites nested UDT field chains correctly (`outer.inner.field[N]`)', () => {
         // The walker descends to the leaf identifier; rewrite anchors there.
+        // NOTE: a UDT field default cannot be a function call (TradingView
+        // CE10133), so the nested instance is assigned after construction
+        // rather than declared with `INNER inner = INNER.new()`.
         const code = `
 //@version=6
 indicator("nested UDT chain")
 type INNER
     float v = low
 type OUTER
-    INNER inner = INNER.new()
+    INNER inner
 bar = OUTER.new()
+bar.inner := INNER.new()
 b = bar.inner.v[1]
 plot(close)
         `;
@@ -429,17 +442,9 @@ plot(close)
     });
 });
 
-// ── 3. Smoke tests — does-not-crash and output-shape integrity ────────
+// ── 3. Pipeline value tests ────────────────────────────────────────────
 
-// Note: full TV-vs-PineTS value equivalence is covered end-to-end by the
-// automated test at:
-//   Automations/PineTS/pinescripts/lang/udt_field_subscript.pine
-// The smoke tests below verify that the transpile + run pipeline doesn't
-// throw on the bug-triggering shapes — protecting against regressions in
-// the surrounding wiring (preProcessUdtRegistry registration, walker
-// short-circuits, etc.) that would silently re-break the behavior.
-
-describe('UDT field subscript — pipeline smoke tests', () => {
+describe('UDT field subscript — pipeline values', () => {
     const mkPts = () =>
         new PineTS(
             Provider.Mock,
@@ -450,47 +455,40 @@ describe('UDT field subscript — pipeline smoke tests', () => {
             new Date('2019-04-15').getTime(),
         );
 
-    it('Bug 2 smoke — function-arg `f(bar.field[N])` does not crash', async () => {
-        // Before the surgical fix in transformFunctionArgument's isArrayAccess
-        // branch, this exact shape threw `ReferenceError: bar is not defined`
-        // because the leaf `bar` Identifier was never scoped to `glb1_bar`.
-        await expect(
-            mkPts().run(`
+    it('matches builtin history for `f(bar.field[N])`', async () => {
+        const { plots } = await mkPts().run(`
 //@version=5
-indicator("bug2smoke")
+indicator("function argument history")
 type BAR
     float low_v = low
 bar = BAR.new()
 f(x) => x
 plot(f(bar.low_v[1]), "out")
-            `),
-        ).resolves.toBeDefined();
+plot(low[1], "control")
+        `);
+
+        expectHistoryToMatch(plots, 'out', 'control');
     });
 
-    it('Bug 1 smoke — top-level `b = bar.field[N]` does not crash', async () => {
-        // Before the rewrite in transformMemberExpression, this shape compiled
-        // but emitted `$.init(t, value, 1)` with the lookback as a stray third
-        // arg silently ignored. Verifies the script still runs end-to-end.
-        await expect(
-            mkPts().run(`
+    it('matches builtin history for a top-level field read', async () => {
+        const { plots } = await mkPts().run(`
 //@version=5
-indicator("bug1smoke")
+indicator("top-level history")
 type BAR
     float low_v = low
 bar = BAR.new()
 b = bar.low_v[1]
 plot(b, "out")
-            `),
-        ).resolves.toBeDefined();
+plot(low[1], "control")
+        `);
+
+        expectHistoryToMatch(plots, 'out', 'control');
     });
 
-    it('Case 1 smoke — `bar = makeBar()` then `bar.field[N]` runs without error', async () => {
-        // Verifies that user-function-return type inference enables the rewrite
-        // for the indirect initialization pattern.
-        await expect(
-            mkPts().run(`
+    it('matches builtin history for a returned UDT', async () => {
+        const { plots } = await mkPts().run(`
 //@version=5
-indicator("case1smoke")
+indicator("returned UDT history")
 type BAR
     float low_v = low
 makeBar() =>
@@ -498,37 +496,32 @@ makeBar() =>
 bar = makeBar()
 b = bar.low_v[1]
 plot(b, "out")
-            `),
-        ).resolves.toBeDefined();
+plot(low[1], "control")
+        `);
+
+        expectHistoryToMatch(plots, 'out', 'control');
     });
 
-    it('Case 2 smoke — `readField(BAR b) => b.field[N]` runs without "b is not defined"', async () => {
-        // Verifies the typed-parameter path: pine2js emits __pineParamTypes__,
-        // AnalysisPass populates the per-function registry, and
-        // transformFunctionDeclaration scope-locally registers `b` as a UDT
-        // instance for the duration of the body. Before the fix, `b.low_v[N]`
-        // inside the body either crashed or silently returned the wrong value.
-        await expect(
-            mkPts().run(`
+    it('matches builtin history for a typed UDF parameter', async () => {
+        const { plots } = await mkPts().run(`
 //@version=5
-indicator("case2smoke")
+indicator("typed parameter history")
 type BAR
     float low_v = low
 readField(BAR b) =>
     b.low_v[1]
 bar = BAR.new()
 plot(readField(bar), "out")
-            `),
-        ).resolves.toBeDefined();
+plot(low[1], "control")
+        `);
+
+        expectHistoryToMatch(plots, 'out', 'control');
     });
 
-    it('Case 4 smoke — `[a, b] = makeBars()` then `a.field[N]` runs without error', async () => {
-        // Verifies that tuple-return inference + ArrayPattern slot registration
-        // enable the rewrite for the destructuring pattern.
-        await expect(
-            mkPts().run(`
+    it('matches builtin history after tuple destructuring', async () => {
+        const { plots } = await mkPts().run(`
 //@version=5
-indicator("case4smoke")
+indicator("tuple UDT history")
 type BAR
     float low_v = low
 makeBars() =>
@@ -536,8 +529,29 @@ makeBars() =>
 [a, b] = makeBars()
 plot(a.low_v[1], "outA")
 plot(b.low_v[2], "outB")
-            `),
-        ).resolves.toBeDefined();
+plot(low[1], "controlA")
+plot(low[2], "controlB")
+        `);
+
+        expectHistoryToMatch(plots, 'outA', 'controlA');
+        expectHistoryToMatch(plots, 'outB', 'controlB');
+    });
+
+    it('matches builtin history for a nested field on a var UDT', async () => {
+        const { plots } = await mkPts().run(`
+//@version=6
+indicator("nested UDT history")
+type INNER
+    float value
+type OUTER
+    INNER inner
+var OUTER bar = OUTER.new(INNER.new(0.0))
+bar.inner.value := low
+plot(bar.inner.value[1], "out")
+plot(low[1], "control")
+        `);
+
+        expectHistoryToMatch(plots, 'out', 'control');
     });
 
     it('UDT-instance discrimination — script using polyline.new() does not crash', async () => {

@@ -67,7 +67,7 @@ plot(chg, "daily_change")
 });
 
 describe('timeframe.change() — intraday chart (Binance)', () => {
-    const makePineTS = () => new PineTS(Provider.Binance, 'BTCUSDC', '15', 200);
+    const makePineTS = () => new PineTS(Provider.Mock, 'BTCUSDC', '15', 200);
 
     it('timeframe.change("D") fires once per day on 15min chart', async () => {
         const code = `
@@ -135,7 +135,7 @@ plot(chg, "4h_change")
 
 describe('timeframe.change() — consistency with time()', () => {
     it('timeframe.change fires exactly when time() value changes', async () => {
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDC', '15', 100);
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', '15', 100);
         const code = `
 //@version=5
 indicator("tf.change vs time consistency")

@@ -51,6 +51,8 @@ export interface InputSite {
 export interface AnalyzeInputsOptions {
     /** Pine version of the script — v5 truncates `const int / const int`. */
     version?: number | null;
+    /** Keep library input IDs separate from the importing indicator's IDs. */
+    idPrefix?: string;
 }
 
 const UNTITLED = 'untitled';
@@ -172,12 +174,14 @@ class InputAnalyzer {
     private readonly inputDefaults = new WeakMap<object, ConstValue>();
     private readonly functionNames = new Set<string>();
     private readonly truncatingIntDivision: boolean;
+    private readonly idPrefix: string;
 
     constructor(
         private readonly ast: any,
         options: AnalyzeInputsOptions,
     ) {
         this.truncatingIntDivision = options.version != null && options.version < 6;
+        this.idPrefix = options.idPrefix ?? '';
     }
 
     run(): InputSite[] {
@@ -489,7 +493,7 @@ class InputAnalyzer {
 
         this.inlineDefval(raw.defval, ctx.scope);
 
-        const id = `in_${this.sites.length}`;
+        const id = `${this.idPrefix}in_${this.sites.length}`;
         const title = typeof values.title === 'string' ? values.title : undefined;
         const varId = ctx.target ?? undefined;
         const site: InputSite = { id, fn, name: title ?? ctx.target ?? ctx.fnName ?? UNTITLED, args: values };

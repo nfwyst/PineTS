@@ -64,4 +64,16 @@ describe('MockProvider returns the same candles on every request', () => {
         // A daily crypto bar holds 24 hourly intrabars (TradingView: 24 on BINANCE:BTCUSDT).
         expect(new Set([...a.pure, ...a.udf])).toEqual(new Set([24]));
     });
+
+    it('applies a limit from the end when no start date is provided', async () => {
+        const provider = new MockProvider(dataDirectory);
+        const end = Date.UTC(2024, 0, 5, 23, 59, 59, 999);
+
+        const bars = await provider.getMarketData('BTCUSDC', 'D', 2, 0, end);
+
+        expect(bars.map((bar) => bar.openTime)).toEqual([
+            Date.UTC(2024, 0, 4),
+            Date.UTC(2024, 0, 5),
+        ]);
+    });
 });

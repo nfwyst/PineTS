@@ -2,6 +2,11 @@
 
 const BINANCE_API_URL_DEFAULT = 'https://api.binance.com/api/v3';
 const BINANCE_API_URL_US = 'https://api.binance.us/api/v3';
+const BINANCE_API_URL_USD_M = 'https://fapi.binance.com/fapi/v1';
+const BINANCE_API_URL_COIN_M = 'https://dapi.binance.com/dapi/v1';
+const BINANCE_PING_TIMEOUT_MS = 5_000;
+const PERPETUAL_SUFFIX = '.P';
+const USD_M_PERPETUAL_SUFFIX = `USDT${PERPETUAL_SUFFIX}`;
 
 const timeframe_to_binance = {
     '1': '1m', // 1 minute
@@ -23,14 +28,22 @@ const timeframe_to_binance = {
     M: '1M', // 1 month
 };
 
-import { ISymbolInfo } from '@pinets/marketData/IProvider';
-import { BaseProvider } from '@pinets/marketData/BaseProvider';
+import { ISymbolInfo } from '../IProvider';
+import { BaseProvider } from '../BaseProvider';
 import { stripTickerModifier } from '../../tickerModifier';
-import { Kline, INTERVAL_DURATION_MS } from '@pinets/marketData/types';
+import { Kline, INTERVAL_DURATION_MS } from '../types';
+import { fetchWithTimeout } from '../fetchWithTimeout';
 
 interface CacheEntry<T> {
     data: T;
     timestamp: number;
+}
+
+interface BinanceMarketRoute {
+    readonly apiUrl: string;
+    readonly apiSymbol: string;
+    readonly marketType: 'crypto' | 'futures';
+    readonly contractType: '' | 'Perpetual' | 'Delivery';
 }
 
 /** Config for BinanceProvider (no API key needed). */
@@ -111,10 +124,7 @@ export class BinanceProvider extends BaseProvider<BinanceProviderConfig> {
 
         // Try default endpoint
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
-            const response = await fetch(`${BINANCE_API_URL_DEFAULT}/ping`, { signal: controller.signal });
-            clearTimeout(timeoutId);
+            const response = await fetchWithTimeout(`${BINANCE_API_URL_DEFAULT}/ping`, {}, BINANCE_PING_TIMEOUT_MS);
             if (response.ok) {
                 this.activeApiUrl = BINANCE_API_URL_DEFAULT;
                 return this.activeApiUrl;
@@ -126,10 +136,7 @@ export class BinanceProvider extends BaseProvider<BinanceProviderConfig> {
 
         // Try US endpoint
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            const response = await fetch(`${BINANCE_API_URL_US}/ping`, { signal: controller.signal });
-            clearTimeout(timeoutId);
+            const response = await fetchWithTimeout(`${BINANCE_API_URL_US}/ping`, {}, BINANCE_PING_TIMEOUT_MS);
             if (response.ok) {
                 this.activeApiUrl = BINANCE_API_URL_US;
                 return this.activeApiUrl;
@@ -140,6 +147,33 @@ export class BinanceProvider extends BaseProvider<BinanceProviderConfig> {
 
         // Fallback to default if check fails entirely (let actual request fail)
         return BINANCE_API_URL_DEFAULT;
+    }
+
+    private async getMarketRoute(tickerId: string): Promise<BinanceMarketRoute> {
+        if (tickerId.endsWith(USD_M_PERPETUAL_SUFFIX)) {
+            return {
+                apiUrl: BINANCE_API_URL_USD_M,
+                apiSymbol: tickerId.slice(0, -PERPETUAL_SUFFIX.length),
+                marketType: 'futures',
+                contractType: 'Perpetual',
+            };
+        }
+
+        if (tickerId.includes('_')) {
+            return {
+                apiUrl: BINANCE_API_URL_COIN_M,
+                apiSymbol: tickerId,
+                marketType: 'futures',
+                contractType: 'Delivery',
+            };
+        }
+
+        return {
+            apiUrl: await this.getBaseUrl(),
+            apiSymbol: tickerId,
+            marketType: 'crypto',
+            contractType: '',
+        };
     }
 
     /**
@@ -153,8 +187,8 @@ export class BinanceProvider extends BaseProvider<BinanceProviderConfig> {
             return [];
         }
 
-        const baseUrl = await this.getBaseUrl();
-        let url = `${baseUrl}/klines?symbol=${tickerId}&interval=${interval}`;
+        const { apiUrl, apiSymbol } = await this.getMarketRoute(tickerId);
+        let url = `${apiUrl}/klines?symbol=${apiSymbol}&interval=${interval}`;
 
         if (limit) {
             url += `&limit=${Math.min(limit, 1000)}`;
@@ -166,7 +200,7 @@ export class BinanceProvider extends BaseProvider<BinanceProviderConfig> {
             url += `&endTime=${eDate}`;
         }
 
-        const response = await fetch(url);
+        const response = await fetchWithTimeout(url);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -230,8 +264,7 @@ export class BinanceProvider extends BaseProvider<BinanceProviderConfig> {
             this.normalizeCloseTime(allData);
             return allData;
         } catch (error) {
-            console.error('Error in getMarketDataInterval:', error);
-            return [];
+            throw error;
         }
     }
 
@@ -328,8 +361,7 @@ export class BinanceProvider extends BaseProvider<BinanceProviderConfig> {
 
             return data;
         } catch (error) {
-            console.error('Error in binance.klines:', error);
-            return [];
+            throw error;
         }
     }
 
@@ -353,32 +385,13 @@ export class BinanceProvider extends BaseProvider<BinanceProviderConfig> {
             // tickerId comes in as "BTCUSDT" or "BTCUSDT.P"
             // We keep it EXACTLY as is for ticker field (Pine Script includes .P)
 
-            let marketType: 'crypto' | 'futures' = 'crypto';
-            const baseUrl = await this.getBaseUrl();
-            let apiUrl = baseUrl; // Default to resolved spot API
-            let apiSymbol = tickerId; // Symbol for API call
-            let contractType = '';
-
-            if (tickerId.endsWith('.P')) {
-                // USDT-Margined Perpetual Futures
-                marketType = 'futures';
-                apiSymbol = tickerId.replace('.P', ''); // Remove .P only for Binance API call
-                apiUrl = 'https://fapi.binance.com/fapi/v1';
-                contractType = 'Perpetual';
-                // NOTE: ticker field will KEEP the .P suffix (as Pine Script does)
-            } else if (tickerId.includes('_')) {
-                // COIN-Margined Delivery Futures
-                marketType = 'futures';
-                apiSymbol = tickerId; // API might use this format directly
-                apiUrl = 'https://dapi.binance.com/dapi/v1';
-                contractType = 'Delivery';
-            }
+            const { apiUrl, apiSymbol, marketType, contractType } = await this.getMarketRoute(tickerId);
 
             // Fetch from appropriate API
             // Note: Spot API supports ?symbol= parameter, but futures APIs return all symbols
             const url = marketType === 'crypto' ? `${apiUrl}/exchangeInfo?symbol=${apiSymbol}` : `${apiUrl}/exchangeInfo`;
 
-            const response = await fetch(url);
+            const response = await fetchWithTimeout(url);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }

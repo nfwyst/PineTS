@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Indicator, PineTS, Provider } from 'index';
+import { normalizePlotString } from '../utils';
 
 describe('Indicators', () => {
     it('SPREAD_MA - Spread MA', async () => {
@@ -62,7 +63,7 @@ plot(ssma, "_plot", color.blue, linewidth=2)
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
 
@@ -121,6 +122,6 @@ plot(ssma, "_plot", color.blue, linewidth=2)
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });    
 });

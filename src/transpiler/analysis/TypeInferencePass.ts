@@ -35,7 +35,8 @@
 import ScopeManager from './ScopeManager';
 import { ASTFactory } from '../utils/ASTFactory';
 
-type T = 'constint' | 'int' | 'notint';
+export type InferredPineType = 'constint' | 'int' | 'notint';
+type T = InferredPineType;
 
 /**
  * Built-in variables that are `int`-typed in Pine. They are series-qualified,
@@ -139,7 +140,10 @@ function join(a: T, b: T): T {
 /** Scope stack of variable-name → inferred type. Pine rarely shadows, but function
  *  bodies get their own frame so a param never leaks a type to the global scope. */
 class Env {
-    private stack: Map<string, T>[] = [new Map()];
+    private stack: Map<string, T>[];
+    constructor(initialTypes: ReadonlyMap<string, T> = new Map()) {
+        this.stack = [new Map(initialTypes)];
+    }
     push(): void { this.stack.push(new Map()); }
     pop(): void { if (this.stack.length > 1) this.stack.pop(); }
     /** Declaration: establish a variable's type in the current scope. */
@@ -151,6 +155,7 @@ class Env {
         }
         return undefined;
     }
+    snapshotGlobal(): ReadonlyMap<string, T> { return new Map(this.stack[0]); }
     /**
      * Reassignment (`x := ...`): JOIN with the existing type. A variable is
      * int-ish only if EVERY value it holds is int-ish; once it takes a `notint`
@@ -173,10 +178,16 @@ class Env {
 export interface TypeInferenceOptions {
     /** Rewrite `const int / const int` to a truncating division (Pine v5 only). */
     intDivision: boolean;
+    /** Types exported by earlier linked-library version scopes. */
+    inheritedTypes?: ReadonlyMap<string, InferredPineType>;
 }
 
-export function runTypeInferencePass(ast: any, _scopeManager: ScopeManager, options: TypeInferenceOptions = { intDivision: true }): void {
-    const env = new Env();
+export function runTypeInferencePass(
+    ast: any,
+    _scopeManager: ScopeManager,
+    options: TypeInferenceOptions = { intDivision: true },
+): ReadonlyMap<string, InferredPineType> {
+    const env = new Env(options.inheritedTypes);
     const mutatedNames = collectMutatedNames(ast);
 
     // Visit a node; for expressions, return its inferred type AND rewrite any
@@ -267,7 +278,7 @@ export function runTypeInferencePass(ast: any, _scopeManager: ScopeManager, opti
                         // `var`/`varip` declarations and any name that is ever
                         // reassigned (incl. loop counters) are at best simple/
                         // series ints in Pine's qualifier model.
-                        if (t === 'constint' && (node.kind === 'var' || mutatedNames.has(d.id.name))) {
+                        if (t === 'constint' && (node.kind === 'var' || node.kind === 'varip' || mutatedNames.has(d.id.name))) {
                             t = 'int';
                         }
                         env.set(d.id.name, t);
@@ -320,4 +331,5 @@ export function runTypeInferencePass(ast: any, _scopeManager: ScopeManager, opti
     }
 
     visit(ast);
+    return env.snapshotGlobal();
 }

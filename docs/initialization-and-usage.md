@@ -29,7 +29,7 @@ This guide explains how to initialize PineTS and run indicators or strategies wi
 ## Installation
 
 ```bash
-npm install pinets
+bun add @nfwyst/pinets
 ```
 
 ---
@@ -47,7 +47,8 @@ const pineTS = new PineTS(
     timeframe?: string,
     limit?: number,
     sDate?: number,
-    eDate?: number
+    eDate?: number,
+    options?: PineTSOptions
 );
 ```
 
@@ -61,6 +62,7 @@ const pineTS = new PineTS(
 | `limit`     | `number`             | No       | Maximum number of candles to fetch (default: provider-specific, max 5000)            |
 | `sDate`     | `number`             | No       | Start date in milliseconds timestamp. Used for date range queries                    |
 | `eDate`     | `number`             | No       | End date in milliseconds timestamp. Used for date range queries                      |
+| `options`   | `PineTSOptions`      | No       | Per-instance host options, including `chartTheme` and `resolveLibrary`                |
 
 \* Required when using a provider, optional when passing an array of data
 
@@ -174,7 +176,7 @@ const defaultData = new PineTS(Provider.Binance, 'BTCUSDT', 'D');
 The easiest way to initialize PineTS is using a built-in data provider:
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 // Basic initialization with limit
 const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 100);
@@ -211,7 +213,7 @@ All providers support the standard timeframe strings: `'1'`, `'3'`, `'5'`, `'15'
 You can also provide your own OHLCV data as an array:
 
 ```typescript
-import { PineTS } from 'pinets';
+import { PineTS } from '@nfwyst/pinets';
 
 const customData = [
     {
@@ -243,6 +245,47 @@ Each data point in the array must include:
 | `openTime`  | `number` | No       | Opening time (milliseconds timestamp) |
 | `closeTime` | `number` | No       | Closing time (milliseconds timestamp) |
 
+### Option 3: Resolving imported Pine libraries
+
+PineTS never fetches TradingView libraries itself. Supply their source through the
+per-instance `resolveLibrary` callback. Imports always include an exact version and
+an alias, and returning `undefined` reports a compile-time resolution error before
+the script executes.
+
+```typescript
+import { PineTS } from '@nfwyst/pinets';
+
+const sources = new Map([
+    ['alice/Math/1', `//@version=6
+library("Math")
+export float twice(float value) => value * 2`],
+]);
+
+const pineTS = new PineTS(
+    customData,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+        resolveLibrary: async ({ user, name, version }) =>
+            sources.get(`${user}/${name}/${version}`),
+    }
+);
+
+await pineTS.run(`//@version=6
+indicator("Library example")
+import alice/Math/1 as mathLib
+plot(mathLib.twice(close))`);
+```
+
+The resolver is called at most once per exact `user/name/version` key on each
+`PineTS` instance, including concurrent preparations. Libraries can import other
+libraries. Only exported functions, user-defined types, enums, and `const` values
+are visible through an import alias; cycles and unresolved sources or exports reject
+before any chart bar executes.
+
 ---
 
 ## The run() Method
@@ -252,25 +295,24 @@ The `run()` method executes your indicator or strategy code across all candles i
 ### Syntax
 
 ```typescript
-const context = await pineTS.run(
-    pineTSCode: Indicator | Function | String,
-    n?: number
-): Promise<Context>
+run(pineTSCode: Indicator | Function | String, periods?: number): Promise<Context>
+run(pineTSCode: Indicator | Function | String, periods: number | undefined, pageSize: number): AsyncGenerator<Context>
 ```
 
 ### Parameters
 
-| Parameter    | Type                              | Default     | Description                                                                              |
-| ------------ | --------------------------------- | ----------- | ---------------------------------------------------------------------------------------- |
-| `pineTSCode` | `Indicator \| Function \| String` | Required    | The indicator/strategy function to execute. Use `Indicator` class to pass runtime inputs |
-| `n`          | `number`                          | All periods | Number of most recent periods to process. If not specified, processes all available data |
+| Parameter    | Type                              | Default     | Description                                                                                               |
+| ------------ | --------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
+| `pineTSCode` | `Indicator \| Function \| String` | Required    | The indicator/strategy function to execute. Use `Indicator` class to pass runtime inputs                  |
+| `periods`    | `number`                          | All periods | Number of most recent periods to process. If not specified, processes all available data                  |
+| `pageSize`   | `number`                          | `undefined` | Positive integer periods per page. When provided, `run()` returns an `AsyncGenerator<Context>` instead  |
 
 ### Running with Runtime Inputs
 
 To pass custom input values to your indicator at runtime, wrap the source in an `Indicator` instance. Two equivalent forms — pick whichever is more ergonomic:
 
 ```typescript
-import { PineTS, Provider, Indicator } from 'pinets';
+import { PineTS, Provider, Indicator } from '@nfwyst/pinets';
 
 // Your indicator code (Native Pine Script or PineTS syntax)
 const code = `
@@ -299,12 +341,14 @@ The `Indicator` class also lets you override `indicator()` / `strategy()` declar
 
 ### Return Value
 
-Returns a `Promise<Context>` object containing:
+Without `pageSize`, returns a `Promise<Context>` object containing:
 
 -   `result`: The computed indicator values
 -   `data`: Market data arrays (open, high, low, close, volume, etc.)
 -   `plots`: Any plot data generated
 -   Additional context properties
+
+When a positive integer `pageSize` is provided, `run()` returns an `AsyncGenerator<Context>` that yields one context per page. TA state is managed automatically across the run; there is no cache-enabling flag.
 
 ---
 
@@ -667,7 +711,7 @@ console.log(context.marketData); // Raw OHLCV data
 ### Example 1: Simple Moving Average
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 async function runSMA() {
     // Initialize with 200 daily candles
@@ -691,7 +735,7 @@ runSMA();
 ### Example 2: Multiple Indicators
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 async function runMultipleIndicators() {
     const pineTS = new PineTS(Provider.Binance, 'ETHUSDT', '4H', 500);
@@ -730,7 +774,7 @@ runMultipleIndicators();
 ### Example 3: With Date Range
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 async function runWithDateRange() {
     const startDate = new Date('2024-01-01').getTime();
@@ -770,7 +814,7 @@ runWithDateRange();
 ### Example 4: Custom Data
 
 ```typescript
-import { PineTS } from 'pinets';
+import { PineTS } from '@nfwyst/pinets';
 
 async function runWithCustomData() {
     const customData = [
@@ -798,7 +842,7 @@ runWithCustomData();
 ### Example 5: Processing Last N Periods Only
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 async function runLastNPeriods() {
     // Fetch 1000 candles
@@ -819,19 +863,19 @@ async function runLastNPeriods() {
 runLastNPeriods();
 ```
 
-### Example 6: Using TA Cache for Performance
+### Example 6: Processing Large Datasets in Pages
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
-async function runWithCache() {
+async function runInPages() {
     const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', '1h', 5000);
 
-    // Enable TA cache for better performance on large datasets
-    const { result } = await pineTS.run(
-        (context) => {
-            const { ta } = context;
-            const { close } = context.data;
+    // Process the data in pages of 500 periods. TA state is managed automatically.
+    const pages = pineTS.run(
+        ($) => {
+            const { close } = $.data;
+            const { ta } = $.pine;
 
             const ema20 = ta.ema(close, 20);
             const ema50 = ta.ema(close, 50);
@@ -839,19 +883,21 @@ async function runWithCache() {
             return { ema20, ema50 };
         },
         undefined,
-        true
-    ); // Enable cache
+        500
+    );
 
-    console.log('Results computed with caching enabled');
+    for await (const { result } of pages) {
+        console.log('Page results:', result);
+    }
 }
 
-runWithCache();
+runInPages();
 ```
 
 ### Example 7: Complex Strategy
 
 ```typescript
-import { PineTS, Provider } from 'pinets';
+import { PineTS, Provider } from '@nfwyst/pinets';
 
 async function runComplexStrategy() {
     const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'D', 365);
@@ -909,7 +955,7 @@ runComplexStrategy();
 
 ### 1. Waiting for Data to Load
 
-Always use `await` with `pineTS.run()` since data fetching is asynchronous:
+Use `await` with non-paginated `pineTS.run()` calls since data fetching is asynchronous. Paginated calls return an async generator and are consumed with `for await` as shown above.
 
 ```typescript
 // ✅ Correct
@@ -952,8 +998,11 @@ return sma;
 For large datasets or complex calculations:
 
 ```typescript
-// Enable TA cache
-const { result } = await pineTS.run(indicatorFn, undefined, true);
+// TA state is managed automatically; use a numeric page size to process in chunks
+const pages = pineTS.run(indicatorFn, undefined, 500);
+for await (const context of pages) {
+    console.log(context.result);
+}
 
 // Or process fewer periods
 const { result } = await pineTS.run(indicatorFn, 100); // Last 100 periods only
@@ -1011,6 +1060,22 @@ By default, alerts only fire on the last (realtime) bar. For backtesting, enable
 pine.setAlertMode('all'); // Fire alerts on every bar
 ```
 
+### PineTS Object Messages
+
+Native Pine source keeps string-only alert messages. A PineTS function can pass an object to `alert.any()`; the exported `AlertEvent.message` type is `unknown`:
+
+```typescript
+const ctx = await pine.run(($) => {
+    const payload = { alert: 'RSI above 70' };
+    $.pine.alert.any(payload, $.pine.alert.freq_all);
+    return { payload };
+});
+
+console.log(ctx.alerts[0].message === ctx.result.payload.at(-1)); // true
+```
+
+Object messages are passed by reference without cloning, freezing, or serialization. Callers own their mutability, so later mutations are visible through alert history and stream listener references. Narrow `message` from `unknown` before accessing object properties.
+
 For full documentation including frequency constants, alert modes, and complete examples, see the **[Alerts](../alerts/)** page.
 
 ---
@@ -1020,4 +1085,4 @@ For full documentation including frequency constants, alert modes, and complete 
 -   Check [API Coverage](../api-coverage/) to see all available technical analysis functions
 -   Explore [Language Coverage](../lang-coverage/) to understand Pine Script compatibility
 -   Try our demo indicators: [WillVixFix](../indicators/willvixfix/index.html) and [Squeeze Momentum](../indicators/sqzmom/index.html)
--   Contribute on [GitHub](https://github.com/LuxAlgo/PineTS)
+-   Contribute on [GitHub](https://github.com/nfwyst/PineTS)

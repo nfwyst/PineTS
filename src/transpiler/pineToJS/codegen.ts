@@ -5,6 +5,8 @@
 // Transforms ESTree-compatible AST into JavaScript code
 
 import { CONTEXT_PINE_VARS, NAMESPACE_COLLISION_NAMES, JS_RESERVED_WORDS } from '../settings';
+import { VARIP_DECLARATION_LABEL } from '../markers';
+import { bindBuiltinNamedArguments } from './builtinSignatures';
 
 // Set of names that conflict with Pine context variables/namespaces.
 // Function parameters with these names must be renamed to avoid Phase 2
@@ -560,6 +562,11 @@ export class CodeGenerator {
         }
 
         switch (node.type) {
+            case 'ImportDeclaration':
+                // Imports are resolved and linked before execution. Keeping the
+                // descriptor in the AST while emitting no JavaScript prevents an
+                // unresolved module from being executed in this grammar phase.
+                return;
             case 'FunctionDeclaration':
                 return this.generateFunctionDeclaration(node);
             case 'VariableDeclaration':
@@ -905,7 +912,7 @@ export class CodeGenerator {
     // Generate VariableDeclaration
     generateVariableDeclaration(node) {
         // PineScript var => JavaScript var (persistent state)
-        // PineScript varip => JavaScript var (persistent intrabar state)
+        // PineScript varip => labeled JavaScript var restored by the PineTS pass
         // PineScript regular declarations => JavaScript let (re-initialized each bar)
         const kind = node.kind === 'var' || node.kind === 'varip' ? 'var' : 'let';
 
@@ -928,6 +935,7 @@ export class CodeGenerator {
                 if (varName) {
                     // Declare variable without initialization
                     this.write(this.indentStr.repeat(this.indent));
+                    if (node.kind === 'varip') this.write(`${VARIP_DECLARATION_LABEL}: `);
                     this.write(kind);
                     this.write(' ');
                     this.write(varName);
@@ -941,6 +949,7 @@ export class CodeGenerator {
 
             // Normal variable declaration
             this.write(this.indentStr.repeat(this.indent));
+            if (node.kind === 'varip') this.write(`${VARIP_DECLARATION_LABEL}: `);
             this.write(kind);
             this.write(' ');
 
@@ -1633,9 +1642,31 @@ export class CodeGenerator {
         const calleeName = node.callee?.type === 'Identifier' ? node.callee.name : null;
         const paramList = calleeName ? this.functionParams.get(calleeName) : null;
         const lastArg = node.arguments.length > 0 ? node.arguments[node.arguments.length - 1] : null;
-        const hasNamedArgs = lastArg?.type === 'ObjectExpression' && paramList;
+        const builtinName =
+            node.callee?.type === 'MemberExpression' &&
+            node.callee.object?.type === 'Identifier' &&
+            node.callee.property?.type === 'Identifier'
+                ? `${node.callee.object.name}.${node.callee.property.name}`
+                : null;
+        const namedArguments = lastArg?.type === 'ObjectExpression'
+            ? lastArg.properties.map((property) => ({
+                  name: property.key?.name ?? property.key?.value,
+                  value: property.value,
+              }))
+            : [];
+        const boundBuiltinArgs = builtinName && namedArguments.length > 0
+            ? bindBuiltinNamedArguments(builtinName, node.arguments.slice(0, -1), namedArguments)
+            : undefined;
+        const hasUdfNamedArgs = lastArg?.type === 'ObjectExpression' && paramList;
 
-        if (hasNamedArgs) {
+        if (boundBuiltinArgs) {
+            for (let i = 0; i < boundBuiltinArgs.length; i++) {
+                const argument = boundBuiltinArgs[i];
+                if (argument === undefined) this.write('undefined');
+                else this.generateExpression(argument);
+                if (i < boundBuiltinArgs.length - 1) this.write(', ');
+            }
+        } else if (hasUdfNamedArgs) {
             // Positional args (everything except the last ObjectExpression)
             const positionalArgs = node.arguments.slice(0, -1);
             // Named args from the ObjectExpression

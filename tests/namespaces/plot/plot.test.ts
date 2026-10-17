@@ -197,4 +197,29 @@ describe('PLOT Namespace', () => {
         expect(result.hasP1[0]).toBe(true);
         expect(result.hasP2[0]).toBe(true);
     });
+
+    it('keeps later untitled callsite keys stable when an earlier conditional call is skipped', async () => {
+        const candles = [
+            { openTime: 1, closeTime: 2, open: 100, high: 103, low: 99, close: 102, volume: 1_000 },
+            { openTime: 3, closeTime: 4, open: 102, high: 103, low: 99, close: 100, volume: 1_000 },
+            { openTime: 5, closeTime: 6, open: 100, high: 103, low: 99, close: 102, volume: 1_000 },
+        ];
+        const pineTS = new PineTS(candles);
+
+        const { plots } = await pineTS.run(($) => {
+            const { close, open } = $.data;
+            const { barcolor, bgcolor } = $.pine;
+
+            if (close > open) {
+                bgcolor('#00ff00');
+            }
+            barcolor('#ff0000');
+        });
+
+        expect(Object.keys(plots).filter((key) => !key.startsWith('__'))).toEqual(['#0', '#1']);
+        expect(plots['#0'].options.style).toBe('background');
+        expect(plots['#0'].data).toHaveLength(2);
+        expect(plots['#1'].options.style).toBe('barcolor');
+        expect(plots['#1'].data).toHaveLength(3);
+    });
 });

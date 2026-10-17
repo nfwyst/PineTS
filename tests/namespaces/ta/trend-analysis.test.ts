@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrayPrecision, getKlines, runNSFunctionWithArgs } from '../../utils';
+import { arrayPrecision, getKlines, normalizePlotString, runNSFunctionWithArgs } from '../../utils';
 
 import { Context, PineTS, Provider } from 'index';
 
@@ -66,14 +66,14 @@ describe('Technical Analysis - Trend Analysis', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('CROSSOVER - Crossover Detection', async () => {
         // Crossover returns a boolean per bar, need to collect it over time
         //const klines = await getKlines('BTCUSDT', '1d', 50, 0, 1761350400000 - 1);
         //const pineTS = new PineTS(klines);
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'D', null, new Date('2025-10-29').getTime(), new Date('2025-11-20').getTime());
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDT', 'D', null, new Date('2025-10-29').getTime(), new Date('2025-11-20').getTime());
 
         const sourceCode = (context: Context) => {
             const { close, open } = context.data;
@@ -122,7 +122,7 @@ describe('Technical Analysis - Trend Analysis', () => {
 [2025-11-19T00:00:00.000-00:00]: false
 [2025-11-20T00:00:00.000-00:00]: false`;
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
         //const part = result.crossover ? result.crossover.reverse() : [];
 
         //console.log(' CROSSOVER ', part);
@@ -134,7 +134,7 @@ describe('Technical Analysis - Trend Analysis', () => {
     it('CROSSUNDER - Crossunder Detection', async () => {
         // Crossunder returns a boolean per bar, need to collect it over time
 
-        const pineTS = new PineTS(Provider.Binance, 'BTCUSDT', 'D', null, new Date('2025-10-29').getTime(), new Date('2025-11-20').getTime());
+        const pineTS = new PineTS(Provider.Mock, 'BTCUSDT', 'D', null, new Date('2025-10-29').getTime(), new Date('2025-11-20').getTime());
 
         const sourceCode = (context) => {
             const { close, open } = context.data;
@@ -181,7 +181,7 @@ describe('Technical Analysis - Trend Analysis', () => {
 [2025-11-19T00:00:00.000-00:00]: true
 [2025-11-20T00:00:00.000-00:00]: false`;
 
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('CROSS - Cross Detection', async () => {
@@ -237,7 +237,7 @@ describe('Technical Analysis - Trend Analysis', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('RISING - Rising Trend Detection', async () => {
@@ -293,7 +293,7 @@ describe('Technical Analysis - Trend Analysis', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('FALLING - Falling Trend Detection', async () => {
@@ -349,7 +349,7 @@ describe('Technical Analysis - Trend Analysis', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 
     it('DMI - Directional Movement Index', async () => {
@@ -407,7 +407,7 @@ describe('Technical Analysis - Trend Analysis', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
     it('SAR - Parabolic SAR', async () => {
         const pineTS = new PineTS(Provider.Mock, 'BTCUSDC', 'W', null, new Date('2018-12-10').getTime(), new Date('2020-01-27').getTime());
@@ -462,6 +462,6 @@ describe('Technical Analysis - Trend Analysis', () => {
 
         console.log('expected_plot', expected_plot);
         console.log('plotdata_str', plotdata_str);
-        expect(plotdata_str.trim()).toEqual(expected_plot.trim());
+        expect(normalizePlotString(plotdata_str)).toEqual(normalizePlotString(expected_plot));
     });
 });
